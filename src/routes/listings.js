@@ -11,6 +11,18 @@ import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
+// Helper function to extract and flatten image URL from nested token data
+function flattenImageUrl(listing) {
+  if (listing.tokens && listing.tokens.token_images && listing.tokens.token_images.length > 0) {
+    listing.image_url = listing.tokens.token_images[0].public_url;
+  } else {
+    listing.image_url = null;
+  }
+  // Remove the nested tokens property to keep response clean
+  delete listing.tokens;
+  return listing;
+}
+
 /**
  * @swagger
  * /api/listings:
@@ -68,7 +80,7 @@ router.get('/', authenticate, validatePagination, asyncHandler(async (req, res) 
   const result = await retrySupabaseCall(async () => {
     let query = req.supabaseClient
       .from('listings')
-      .select('*', { count: 'exact' });
+      .select('*, tokens(token_images(public_url))', { count: 'exact' });
 
     // Apply status filter
     query = query.eq('status', status);
@@ -98,10 +110,13 @@ router.get('/', authenticate, validatePagination, asyncHandler(async (req, res) 
     throw error;
   }
 
+  // Flatten the image URLs for each listing
+  const listingsWithImages = (data || []).map(flattenImageUrl);
+
   res.json({
     success: true,
     data: {
-      listings: data || [],
+      listings: listingsWithImages,
       pagination: {
         page,
         limit,
@@ -164,7 +179,7 @@ router.get('/historical', authenticate, validatePagination, asyncHandler(async (
   const result = await retrySupabaseCall(async () => {
     let query = req.supabaseClient
       .from('listings')
-      .select('*', { count: 'exact' });
+      .select('*, tokens(token_images(public_url))', { count: 'exact' });
 
     // Filter for non-active listings
     if (status) {
@@ -198,10 +213,13 @@ router.get('/historical', authenticate, validatePagination, asyncHandler(async (
     throw error;
   }
 
+  // Flatten the image URLs for each historical listing
+  const historicalListingsWithImages = (data || []).map(flattenImageUrl);
+
   res.json({
     success: true,
     data: {
-      listings: data || [],
+      listings: historicalListingsWithImages,
       pagination: {
         page,
         limit,
@@ -510,7 +528,7 @@ router.get('/:id', authenticate, validateListingId, asyncHandler(async (req, res
   const result = await retrySupabaseCall(async () => {
     return await req.supabaseClient
       .from('listings')
-      .select('*')
+      .select('*, tokens(token_images(public_url))')
       .eq('id', id)
       .single();
   });
@@ -528,9 +546,12 @@ router.get('/:id', authenticate, validateListingId, asyncHandler(async (req, res
     throw error;
   }
 
+  // Flatten the image URL for the single listing
+  const listingWithImage = flattenImageUrl(listing);
+
   res.json({
     success: true,
-    data: { listing }
+    data: { listing: listingWithImage }
   });
 }));
 

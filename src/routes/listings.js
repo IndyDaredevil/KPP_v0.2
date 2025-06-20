@@ -23,6 +23,18 @@ function flattenImageUrl(listing) {
   return listing;
 }
 
+// Helper function to extract and flatten image URL for sales records
+function flattenSalesImageUrl(sale) {
+  if (sale.tokens && sale.tokens.token_images && sale.tokens.token_images.public_url) {
+    sale.image_url = sale.tokens.token_images.public_url;
+  } else {
+    sale.image_url = null;
+  }
+  // Remove the nested tokens property to keep response clean
+  delete sale.tokens;
+  return sale;
+}
+
 /**
  * @swagger
  * /api/listings:
@@ -245,7 +257,7 @@ export const getAllSalesHistoryHandler = asyncHandler(async (req, res) => {
   const result = await retrySupabaseCall(async () => {
     let query = req.supabaseClient
       .from('sales_history')
-      .select('*', { count: 'exact' });
+      .select('*, tokens(token_images(public_url))', { count: 'exact' });
 
     // Apply filters
     if (ticker) {
@@ -275,10 +287,13 @@ export const getAllSalesHistoryHandler = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Flatten the image URLs for each sales record
+  const salesWithImages = (data || []).map(flattenSalesImageUrl);
+
   res.json({
     success: true,
     data: {
-      sales: data || [],
+      sales: salesWithImages,
       pagination: {
         page,
         limit,

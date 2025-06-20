@@ -81,6 +81,7 @@ export interface SalesRecord {
   sale_price: number;
   sale_date: string;
   created_at: string;
+  image_url?: string | null; // NEW: Add image URL field
 }
 
 // Kaspa API Types

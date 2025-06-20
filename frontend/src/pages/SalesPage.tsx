@@ -107,7 +107,23 @@ const SalesPage: React.FC = () => {
     <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
       <td className="py-3 px-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+          {sale.image_url ? (
+            <img 
+              src={sale.image_url} 
+              alt={`KASPUNKS #${sale.token_id}`}
+              className="w-10 h-10 rounded-lg object-cover"
+              onError={(e) => {
+                // Fallback to placeholder if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const placeholder = target.nextElementSibling as HTMLElement;
+                if (placeholder) {
+                  placeholder.style.display = 'flex';
+                }
+              }}
+            />
+          ) : null}
+          <div className={`w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center ${sale.image_url ? 'hidden' : ''}`}>
             <span className="text-white font-bold text-sm">#{sale.token_id}</span>
           </div>
           <div>

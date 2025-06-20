@@ -41,7 +41,6 @@ export async function getSystemUserId() {
         .from('users')
         .insert({
           email: 'system@kaspunk-predictor.internal',
-          password: 'system-user-no-login',
           role: 'admin'
         })
         .select('id')

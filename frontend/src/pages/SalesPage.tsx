@@ -92,11 +92,11 @@ const SalesPage: React.FC = () => {
   const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => (
     <button
       onClick={() => handleSortChange(field)}
-      className="flex items-center space-x-1 text-xs font-medium text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors"
+      className="flex items-center space-x-1 text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider hover:text-kaspa-primary-green transition-colors font-kaspa-subheader"
     >
       <span>{children}</span>
       {filters.sortBy === field && (
-        <span className="text-primary-600">
+        <span className="text-kaspa-primary-green">
           {filters.sortOrder === 'asc' ? '↑' : '↓'}
         </span>
       )}
@@ -104,14 +104,14 @@ const SalesPage: React.FC = () => {
   );
 
   const SaleRow = ({ sale }: { sale: SalesRecord }) => (
-    <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+    <tr className="border-b border-kaspa-primary-green/10 hover:bg-kaspa-secondary-green/5 transition-colors">
       <td className="py-3 px-4">
         <div className="flex items-center space-x-3">
           {sale.image_url ? (
             <img 
               src={sale.image_url} 
               alt={`KASPUNKS #${sale.token_id}`}
-              className="w-10 h-10 rounded-lg object-cover"
+              className="w-10 h-10 rounded-lg object-cover border border-kaspa-primary-green/20"
               onError={(e) => {
                 // Fallback to placeholder if image fails to load
                 const target = e.target as HTMLImageElement;
@@ -123,30 +123,30 @@ const SalesPage: React.FC = () => {
               }}
             />
           ) : null}
-          <div className={`w-10 h-10 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center ${sale.image_url ? 'hidden' : ''}`}>
-            <span className="text-white font-bold text-sm">#{sale.token_id}</span>
+          <div className={`w-10 h-10 kaspa-gradient rounded-lg flex items-center justify-center shadow-md ${sale.image_url ? 'hidden' : ''}`}>
+            <span className="text-white font-bold text-sm font-kaspa-header">#{sale.token_id}</span>
           </div>
           <div>
-            <div className="font-medium text-gray-900">KASPUNKS</div>
-            <div className="text-sm text-gray-500">Token #{sale.token_id}</div>
+            <div className="font-medium text-kaspa-primary-dark font-kaspa-body">KASPUNKS</div>
+            <div className="text-sm text-kaspa-primary-gray font-kaspa-body">Token #{sale.token_id}</div>
           </div>
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-sm font-medium text-kaspa-primary-dark font-kaspa-body">
           {formatPrice(sale.sale_price)}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-900">
+        <div className="text-sm text-kaspa-primary-dark font-kaspa-body">
           {formatDate(sale.sale_date)}
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-kaspa-primary-gray font-kaspa-body">
           {formatTimeAgo(sale.sale_date)}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
           {formatDate(sale.created_at)}
         </div>
       </td>
@@ -157,8 +157,8 @@ const SalesPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Sales Data</h3>
-          <p className="text-red-600 mb-4">
+          <h3 className="text-lg font-medium text-red-800 mb-2 font-kaspa-header">Error Loading Sales Data</h3>
+          <p className="text-red-600 mb-4 font-kaspa-body">
             Failed to load sales history data. Please try refreshing the page.
           </p>
           <Button onClick={() => refetch()} variant="outline">
@@ -174,8 +174,10 @@ const SalesPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sales History</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-kaspa-primary-dark font-kaspa-header">
+            Sales History
+          </h1>
+          <p className="text-kaspa-primary-gray mt-1 font-kaspa-body">
             Complete sales history and marketplace analytics
           </p>
         </div>
@@ -183,77 +185,77 @@ const SalesPage: React.FC = () => {
 
       {/* Summary Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Sales</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Total Sales</CardTitle>
             <span className="text-2xl">📊</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{pagination?.total?.toLocaleString() || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">All-time transactions</p>
+            <div className="kaspa-stat-value">{pagination?.total?.toLocaleString() || 0}</div>
+            <p className="kaspa-stat-label">All-time transactions</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Volume</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Total Volume</CardTitle>
             <span className="text-2xl">💰</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPrice(stats.totalVolume)}</div>
-            <p className="text-xs text-gray-500 mt-1">Current page volume</p>
+            <div className="kaspa-stat-value">{formatPrice(stats.totalVolume)}</div>
+            <p className="kaspa-stat-label">Current page volume</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Average Price</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Average Price</CardTitle>
             <span className="text-2xl">📈</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPrice(stats.averagePrice)}</div>
-            <p className="text-xs text-gray-500 mt-1">Current page average</p>
+            <div className="kaspa-stat-value">{formatPrice(stats.averagePrice)}</div>
+            <p className="kaspa-stat-label">Current page average</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Highest Sale</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Highest Sale</CardTitle>
             <span className="text-2xl">🚀</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatPrice(stats.highestSale)}</div>
-            <p className="text-xs text-gray-500 mt-1">Peak sale price</p>
+            <div className="text-2xl font-bold text-kaspa-secondary-green font-kaspa-header">{formatPrice(stats.highestSale)}</div>
+            <p className="kaspa-stat-label">Peak sale price</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Lowest Sale</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Lowest Sale</CardTitle>
             <span className="text-2xl">📉</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatPrice(stats.lowestSale)}</div>
-            <p className="text-xs text-gray-500 mt-1">Floor sale price</p>
+            <div className="text-2xl font-bold text-kaspa-accent-teal font-kaspa-header">{formatPrice(stats.lowestSale)}</div>
+            <p className="kaspa-stat-label">Floor sale price</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Recent Sales</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Recent Sales</CardTitle>
             <span className="text-2xl">🔥</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.recentSales}</div>
-            <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
+            <div className="text-2xl font-bold text-orange-600 font-kaspa-header">{stats.recentSales}</div>
+            <p className="kaspa-stat-label">Last 7 days</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card variant="kaspa">
         <CardHeader>
-          <CardTitle>Filters & Search</CardTitle>
+          <CardTitle className="kaspa-text-gradient">Filters & Search</CardTitle>
           <CardDescription>
             Filter and search through sales history
           </CardDescription>
@@ -273,7 +275,7 @@ const SalesPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
+              <label className="text-sm font-medium text-kaspa-primary-gray block mb-2 font-kaspa-body">
                 Items per page
               </label>
               <select
@@ -317,11 +319,11 @@ const SalesPage: React.FC = () => {
       </Card>
 
       {/* Sales History Table */}
-      <Card>
+      <Card variant="kaspa">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>
+              <CardTitle className="kaspa-text-gradient">
                 Sales History ({pagination?.total?.toLocaleString() || 0})
               </CardTitle>
               <CardDescription>
@@ -333,16 +335,16 @@ const SalesPage: React.FC = () => {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              <span className="ml-3 text-gray-600">Loading sales history...</span>
+              <div className="spinner"></div>
+              <span className="ml-3 text-kaspa-primary-gray font-kaspa-body">Loading sales history...</span>
             </div>
           ) : sales.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📈</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-kaspa-primary-dark mb-2 font-kaspa-header">
                 {searchTokenId ? 'No Matching Sales' : 'No Sales History'}
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-kaspa-primary-gray mb-4 font-kaspa-body">
                 {searchTokenId
                   ? `No sales found for token "${searchTokenId}". Try adjusting your search criteria.`
                   : 'No sales history data is available at this time.'
@@ -352,7 +354,7 @@ const SalesPage: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-kaspa-secondary-green/5">
                   <tr>
                     <th className="py-3 px-4 text-left">
                       <SortButton field="token_id">NFT</SortButton>
@@ -381,10 +383,10 @@ const SalesPage: React.FC = () => {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <Card>
+        <Card variant="kaspa">
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
                 Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                 {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                 {pagination.total} results
@@ -410,10 +412,10 @@ const SalesPage: React.FC = () => {
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
                         disabled={isLoading}
-                        className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                        className={`px-3 py-1 text-sm rounded-md transition-colors font-kaspa-body ${
                           pageNum === pagination.page
-                            ? 'bg-primary-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-kaspa-primary-green text-white'
+                            : 'text-kaspa-primary-gray hover:bg-kaspa-secondary-green/10'
                         }`}
                       >
                         {pageNum}

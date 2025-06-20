@@ -9,21 +9,44 @@ export default {
       colors: {
         border: '#e5e7eb', // gray-200
         background: '#f9fafb', // gray-50
-        foreground: '#111827', // gray-900
-        ring: '#3b82f6', // primary-500
-        'card-foreground': '#111827', // gray-900
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+        foreground: '#231F20', // Kaspa dark
+        ring: '#70C7BA', // Kaspa primary green
+        'card-foreground': '#231F20', // Kaspa dark
+        
+        // Kaspa Brand Colors
+        kaspa: {
+          primary: {
+            green: '#70C7BA',
+            dark: '#231F20',
+            gray: '#B6B6B6',
+          },
+          secondary: {
+            green: '#49EACB',
+            'green-light': '#7FE6D5',
+          },
+          accent: {
+            teal: '#5FB3A6',
+            'dark-blue': '#0A2540',
+            'medium-blue': '#1A3550',
+            'light-blue': '#2A4560',
+          }
         },
+        
+        // Updated primary colors to use Kaspa green
+        primary: {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#70C7BA', // Kaspa primary green
+          600: '#5FB3A6', // Darker Kaspa green
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
+        },
+        
+        // Keep existing grays but add Kaspa variants
         gray: {
           50: '#f9fafb',
           100: '#f3f4f6',
@@ -34,16 +57,21 @@ export default {
           600: '#4b5563',
           700: '#374151',
           800: '#1f2937',
-          900: '#111827',
+          900: '#231F20', // Kaspa dark
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Kaspa Brand Typography
+        'kaspa-header': ['Rubik', 'system-ui', 'sans-serif'], // Headers
+        'kaspa-subheader': ['Oswald', 'system-ui', 'sans-serif'], // Sub-headers
+        'kaspa-body': ['Lato', 'system-ui', 'sans-serif'], // Body text
+        sans: ['Lato', 'Rubik', 'Inter', 'system-ui', 'sans-serif'], // Default with Kaspa fonts first
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'pulse-slow': 'pulse 3s infinite',
+        'kaspa-glow': 'kaspaGlow 2s ease-in-out infinite alternate',
       },
       keyframes: {
         fadeIn: {
@@ -53,6 +81,10 @@ export default {
         slideUp: {
           '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        kaspaGlow: {
+          '0%': { boxShadow: '0 0 5px #70C7BA' },
+          '100%': { boxShadow: '0 0 20px #70C7BA, 0 0 30px #49EACB' },
         },
       },
     },

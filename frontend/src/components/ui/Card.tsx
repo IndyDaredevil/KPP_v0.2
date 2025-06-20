@@ -3,6 +3,7 @@ import { cn } from '../../lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
+  variant?: 'default' | 'kaspa';
 }
 
 interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -26,10 +27,13 @@ interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, children, ...props }, ref) => (
+  ({ className, variant = 'default', children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('card', className)}
+      className={cn(
+        variant === 'kaspa' ? 'kaspa-card' : 'card',
+        className
+      )}
       {...props}
     >
       {children}
@@ -81,7 +85,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
   ({ className, children, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+      className={cn('text-lg font-semibold leading-none tracking-tight text-kaspa-primary-dark font-kaspa-header', className)}
       {...props}
     >
       {children}
@@ -94,7 +98,7 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, CardDescriptionPr
   ({ className, children, ...props }, ref) => (
     <p
       ref={ref}
-      className={cn('text-sm text-gray-500', className)}
+      className={cn('text-sm text-kaspa-primary-gray font-kaspa-body', className)}
       {...props}
     >
       {children}

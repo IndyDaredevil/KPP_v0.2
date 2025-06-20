@@ -32,17 +32,17 @@ const DashboardPage: React.FC = () => {
     trend?: 'up' | 'down' | 'neutral';
     icon: string;
   }) => (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200 kaspa-pulse">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">{title}</CardTitle>
         <span className="text-2xl">{icon}</span>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
-        <p className={`text-xs flex items-center mt-1 ${
-          trend === 'up' ? 'text-green-600' : 
+        <div className="kaspa-stat-value">{value}</div>
+        <p className={`text-xs flex items-center mt-1 font-kaspa-body ${
+          trend === 'up' ? 'text-kaspa-secondary-green' : 
           trend === 'down' ? 'text-red-600' : 
-          'text-gray-500'
+          'text-kaspa-primary-gray'
         }`}>
           {trend === 'up' && '↗️ '}
           {trend === 'down' && '↘️ '}
@@ -53,14 +53,14 @@ const DashboardPage: React.FC = () => {
   );
 
   const ListingRow = ({ listing }: { listing: Listing }) => (
-    <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+    <tr className="border-b border-kaspa-primary-green/10 hover:bg-kaspa-secondary-green/5 transition-colors">
       <td className="py-3 px-4">
         <div className="flex items-center space-x-3">
           {listing.image_url ? (
             <img 
               src={listing.image_url} 
               alt={`${listing.ticker} #${listing.token_id}`}
-              className="w-10 h-10 rounded-lg object-cover"
+              className="w-10 h-10 rounded-lg object-cover border border-kaspa-primary-green/20"
               onError={(e) => {
                 // Fallback to placeholder if image fails to load
                 const target = e.target as HTMLImageElement;
@@ -72,49 +72,49 @@ const DashboardPage: React.FC = () => {
               }}
             />
           ) : null}
-          <div className={`w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center ${listing.image_url ? 'hidden' : ''}`}>
-            <span className="text-white font-bold text-sm">{listing.ticker.slice(0, 2)}</span>
+          <div className={`w-10 h-10 kaspa-gradient rounded-lg flex items-center justify-center shadow-md ${listing.image_url ? 'hidden' : ''}`}>
+            <span className="text-white font-bold text-sm font-kaspa-header">{listing.ticker.slice(0, 2)}</span>
           </div>
           <div>
-            <div className="font-medium text-gray-900">{listing.ticker}</div>
-            <div className="text-sm text-gray-500">Token #{listing.token_id}</div>
+            <div className="font-medium text-kaspa-primary-dark font-kaspa-body">{listing.ticker}</div>
+            <div className="text-sm text-kaspa-primary-gray font-kaspa-body">Token #{listing.token_id}</div>
           </div>
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-sm font-medium text-kaspa-primary-dark font-kaspa-body">
           {formatPrice(Number(listing.total_price))}
         </div>
         {listing.required_kaspa && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-kaspa-primary-gray font-kaspa-body">
             {Number(listing.required_kaspa).toLocaleString()} KAS
           </div>
         )}
       </td>
       <td className="py-3 px-4">
         {listing.rarity_rank ? (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+          <span className="kaspa-badge">
             #{listing.rarity_rank}
           </span>
         ) : (
-          <span className="text-gray-400 text-sm">-</span>
+          <span className="text-kaspa-primary-gray text-sm">-</span>
         )}
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-900">
+        <div className="text-sm text-kaspa-primary-dark font-kaspa-body">
           {truncateAddress(listing.seller_wallet_address)}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
           {formatDate(listing.created_at || '')}
         </div>
       </td>
       <td className="py-3 px-4">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-kaspa-body ${
           listing.source === 'kaspa_api' 
-            ? 'bg-blue-100 text-blue-800' 
-            : 'bg-green-100 text-green-800'
+            ? 'bg-kaspa-secondary-green/10 text-kaspa-primary-green border border-kaspa-primary-green/20' 
+            : 'bg-kaspa-secondary-green text-white'
         }`}>
           {listing.source === 'kaspa_api' ? 'API' : 'Manual'}
         </span>
@@ -126,8 +126,8 @@ const DashboardPage: React.FC = () => {
     return (
       <div className="max-w-7xl mx-auto">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Dashboard</h3>
-          <p className="text-red-600">
+          <h3 className="text-lg font-medium text-red-800 mb-2 font-kaspa-header">Error Loading Dashboard</h3>
+          <p className="text-red-600 font-kaspa-body">
             Failed to load dashboard data. Please try refreshing the page.
           </p>
         </div>
@@ -140,8 +140,10 @@ const DashboardPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-kaspa-primary-dark font-kaspa-header">
+            Dashboard
+          </h1>
+          <p className="text-kaspa-primary-gray mt-1 font-kaspa-body">
             Overview of NFT listings and marketplace activity
           </p>
         </div>
@@ -180,11 +182,11 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Recent Listings */}
-      <Card>
+      <Card variant="kaspa">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Recent Active Listings</CardTitle>
+              <CardTitle className="kaspa-text-gradient">Recent Active Listings</CardTitle>
               <CardDescription>
                 Latest NFT listings in the marketplace
               </CardDescription>
@@ -199,38 +201,38 @@ const DashboardPage: React.FC = () => {
         <CardContent className="p-0">
           {listingsLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              <span className="ml-3 text-gray-600">Loading listings...</span>
+              <div className="spinner"></div>
+              <span className="ml-3 text-kaspa-primary-gray font-kaspa-body">Loading listings...</span>
             </div>
           ) : listings.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📦</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Listings</h3>
-              <p className="text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-kaspa-primary-dark mb-2 font-kaspa-header">No Active Listings</h3>
+              <p className="text-kaspa-primary-gray mb-4 font-kaspa-body">
                 No active NFT listings found in the marketplace
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-kaspa-secondary-green/5">
                   <tr>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       NFT
                     </th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       Price
                     </th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       Rarity
                     </th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       Seller
                     </th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       Listed
                     </th>
-                    <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 text-left text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider font-kaspa-subheader">
                       Source
                     </th>
                   </tr>
@@ -248,7 +250,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200 cursor-pointer kaspa-glow">
           <Link to="/listings" className="block">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -262,7 +264,7 @@ const DashboardPage: React.FC = () => {
           </Link>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200 cursor-pointer kaspa-glow">
           <Link to="/sales" className="block">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -276,7 +278,7 @@ const DashboardPage: React.FC = () => {
           </Link>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200 cursor-pointer kaspa-glow">
           <Link to="/historical" className="block">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -290,7 +292,7 @@ const DashboardPage: React.FC = () => {
           </Link>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200 cursor-pointer kaspa-glow">
           <Link to="/api-test" className="block">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">

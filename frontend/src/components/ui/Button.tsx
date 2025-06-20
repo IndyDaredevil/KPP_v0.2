@@ -10,13 +10,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading = false, disabled, children, ...props }, ref) => {
-    const baseClasses = 'btn';
+    const baseClasses = 'btn font-kaspa-body';
     
     const variantClasses = {
       primary: 'btn-primary',
       secondary: 'btn-secondary',
       outline: 'btn-outline',
-      ghost: 'hover:bg-gray-100 text-gray-700',
+      ghost: 'hover:bg-kaspa-secondary-green/10 text-kaspa-primary-gray hover:text-kaspa-primary-green',
       destructive: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
     };
     

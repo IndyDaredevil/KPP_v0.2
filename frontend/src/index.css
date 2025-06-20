@@ -14,6 +14,17 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   
+  /* Light mode overrides */
+  @media (prefers-color-scheme: light) {
+    body {
+      @apply bg-gray-50 text-gray-900;
+    }
+    
+    * {
+      @apply border-gray-200;
+    }
+  }
+  
   html {
     scroll-behavior: smooth;
   }
@@ -21,6 +32,13 @@
   /* Kaspa Brand Typography */
   h1, h2, h3, h4, h5, h6 {
     @apply font-kaspa-header text-white;
+  }
+  
+  /* Light mode typography */
+  @media (prefers-color-scheme: light) {
+    h1, h2, h3, h4, h5, h6 {
+      @apply text-gray-900;
+    }
   }
   
   .kaspa-subheader {
@@ -33,6 +51,13 @@
     @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kaspa-primary-green focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-kaspa-accent-dark-blue;
   }
   
+  /* Light mode button adjustments */
+  @media (prefers-color-scheme: light) {
+    .btn {
+      @apply ring-offset-white;
+    }
+  }
+  
   .btn-primary {
     @apply bg-kaspa-primary-green text-kaspa-accent-dark-blue hover:bg-kaspa-secondary-green active:bg-kaspa-accent-teal shadow-lg hover:shadow-kaspa-primary-green/20 transform hover:scale-105;
   }
@@ -41,8 +66,22 @@
     @apply bg-kaspa-accent-medium-blue text-white hover:bg-kaspa-accent-light-blue active:bg-kaspa-accent-light-blue border border-kaspa-primary-green/20;
   }
   
+  /* Light mode secondary button */
+  @media (prefers-color-scheme: light) {
+    .btn-secondary {
+      @apply bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300 border-gray-300;
+    }
+  }
+  
   .btn-outline {
     @apply border border-kaspa-primary-green bg-transparent text-kaspa-primary-green hover:bg-kaspa-primary-green hover:text-kaspa-accent-dark-blue active:bg-kaspa-secondary-green transform hover:scale-105;
+  }
+  
+  /* Light mode outline button */
+  @media (prefers-color-scheme: light) {
+    .btn-outline {
+      @apply hover:text-white;
+    }
   }
   
   .btn-sm {
@@ -61,8 +100,22 @@
     @apply flex h-10 w-full rounded-md border border-kaspa-primary-green/30 bg-kaspa-accent-medium-blue px-3 py-2 text-sm text-white ring-offset-kaspa-accent-dark-blue file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-kaspa-primary-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kaspa-primary-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
   
+  /* Light mode input */
+  @media (prefers-color-scheme: light) {
+    .input {
+      @apply border-gray-300 bg-white text-gray-900 ring-offset-white placeholder:text-gray-500;
+    }
+  }
+  
   .card {
     @apply rounded-lg border border-kaspa-primary-green/20 bg-kaspa-accent-medium-blue text-white shadow-lg hover:shadow-xl transition-all duration-200 backdrop-blur-sm;
+  }
+  
+  /* Light mode card */
+  @media (prefers-color-scheme: light) {
+    .card {
+      @apply border-gray-200 bg-white text-gray-900 shadow-sm hover:shadow-md;
+    }
   }
   
   .card-header {
@@ -86,12 +139,33 @@
     @apply bg-gradient-to-br from-kaspa-accent-dark-blue via-kaspa-accent-medium-blue to-kaspa-accent-light-blue;
   }
   
+  /* Light mode gradient alternative */
+  @media (prefers-color-scheme: light) {
+    .kaspa-gradient-dark {
+      @apply bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200;
+    }
+  }
+  
   .kaspa-card {
     @apply card border-kaspa-primary-green/30 hover:border-kaspa-primary-green/50 hover:shadow-kaspa-primary-green/10 bg-kaspa-accent-medium-blue/80 backdrop-blur-md;
   }
   
+  /* Light mode kaspa card */
+  @media (prefers-color-scheme: light) {
+    .kaspa-card {
+      @apply border-kaspa-primary-green/20 hover:border-kaspa-primary-green/40 bg-white/90 hover:shadow-kaspa-primary-green/5;
+    }
+  }
+  
   .kaspa-badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-kaspa-primary-green/20 text-kaspa-secondary-green border border-kaspa-primary-green/30;
+  }
+  
+  /* Light mode badge */
+  @media (prefers-color-scheme: light) {
+    .kaspa-badge {
+      @apply bg-kaspa-primary-green/10 text-kaspa-primary-green border-kaspa-primary-green/20;
+    }
   }
   
   .kaspa-stat-card {
@@ -102,8 +176,22 @@
     @apply text-2xl font-bold text-kaspa-secondary-green font-kaspa-header;
   }
   
+  /* Light mode stat value */
+  @media (prefers-color-scheme: light) {
+    .kaspa-stat-value {
+      @apply text-kaspa-primary-green;
+    }
+  }
+  
   .kaspa-stat-label {
     @apply text-sm text-kaspa-primary-gray font-kaspa-body mt-1;
+  }
+  
+  /* Light mode stat label */
+  @media (prefers-color-scheme: light) {
+    .kaspa-stat-label {
+      @apply text-gray-600;
+    }
   }
 }
 
@@ -148,6 +236,21 @@
   background: #49EACB;
 }
 
+/* Light mode scrollbar */
+@media (prefers-color-scheme: light) {
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #70C7BA;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #5FB3A6;
+  }
+}
+
 /* Loading spinner with Kaspa colors */
 .spinner {
   @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-kaspa-primary-green border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite];
@@ -180,4 +283,16 @@
 
 .kaspa-glow {
   animation: kaspa-glow 2s ease-in-out infinite;
+}
+
+/* Light mode glow effect adjustment */
+@media (prefers-color-scheme: light) {
+  @keyframes kaspa-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px #70C7BA20;
+    }
+    50% {
+      box-shadow: 0 0 15px #70C7BA40, 0 0 25px #49EACB20;
+    }
+  }
 }

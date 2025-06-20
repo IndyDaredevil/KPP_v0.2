@@ -87,7 +87,14 @@ export default {
           '100%': { boxShadow: '0 0 20px #70C7BA, 0 0 30px #49EACB' },
         },
       },
+      // Add dark mode variants
+      screens: {
+        'dark': {'raw': '(prefers-color-scheme: dark)'},
+        'light': {'raw': '(prefers-color-scheme: light)'},
+      },
     },
   },
   plugins: [],
+  // Enable dark mode based on system preference
+  darkMode: 'media',
 }

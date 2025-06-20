@@ -76,13 +76,13 @@ const DashboardPage: React.FC = () => {
             <span className="text-white font-bold text-sm font-kaspa-header">{listing.ticker.slice(0, 2)}</span>
           </div>
           <div>
-            <div className="font-medium text-kaspa-primary-dark font-kaspa-body">{listing.ticker}</div>
+            <div className="font-medium text-white font-kaspa-body">{listing.ticker}</div>
             <div className="text-sm text-kaspa-primary-gray font-kaspa-body">Token #{listing.token_id}</div>
           </div>
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm font-medium text-kaspa-primary-dark font-kaspa-body">
+        <div className="text-sm font-medium text-white font-kaspa-body">
           {formatPrice(Number(listing.total_price))}
         </div>
         {listing.required_kaspa && (
@@ -101,7 +101,7 @@ const DashboardPage: React.FC = () => {
         )}
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-kaspa-primary-dark font-kaspa-body">
+        <div className="text-sm text-white font-kaspa-body">
           {truncateAddress(listing.seller_wallet_address)}
         </div>
       </td>
@@ -140,7 +140,7 @@ const DashboardPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-kaspa-primary-dark font-kaspa-header">
+          <h1 className="text-3xl font-bold kaspa-text-gradient font-kaspa-header">
             Dashboard
           </h1>
           <p className="text-kaspa-primary-gray mt-1 font-kaspa-body">
@@ -207,7 +207,7 @@ const DashboardPage: React.FC = () => {
           ) : listings.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📦</div>
-              <h3 className="text-lg font-medium text-kaspa-primary-dark mb-2 font-kaspa-header">No Active Listings</h3>
+              <h3 className="text-lg font-medium text-white mb-2 font-kaspa-header">No Active Listings</h3>
               <p className="text-kaspa-primary-gray mb-4 font-kaspa-body">
                 No active NFT listings found in the marketplace
               </p>

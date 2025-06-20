@@ -127,18 +127,18 @@ const SalesPage: React.FC = () => {
             <span className="text-white font-bold text-sm font-kaspa-header">#{sale.token_id}</span>
           </div>
           <div>
-            <div className="font-medium text-kaspa-primary-dark font-kaspa-body">KASPUNKS</div>
+            <div className="font-medium text-white font-kaspa-body">KASPUNKS</div>
             <div className="text-sm text-kaspa-primary-gray font-kaspa-body">Token #{sale.token_id}</div>
           </div>
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm font-medium text-kaspa-primary-dark font-kaspa-body">
+        <div className="text-sm font-medium text-white font-kaspa-body">
           {formatPrice(sale.sale_price)}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-kaspa-primary-dark font-kaspa-body">
+        <div className="text-sm text-white font-kaspa-body">
           {formatDate(sale.sale_date)}
         </div>
         <div className="text-xs text-kaspa-primary-gray font-kaspa-body">
@@ -174,7 +174,7 @@ const SalesPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-kaspa-primary-dark font-kaspa-header">
+          <h1 className="text-3xl font-bold kaspa-text-gradient font-kaspa-header">
             Sales History
           </h1>
           <p className="text-kaspa-primary-gray mt-1 font-kaspa-body">
@@ -341,7 +341,7 @@ const SalesPage: React.FC = () => {
           ) : sales.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📈</div>
-              <h3 className="text-lg font-medium text-kaspa-primary-dark mb-2 font-kaspa-header">
+              <h3 className="text-lg font-medium text-white mb-2 font-kaspa-header">
                 {searchTokenId ? 'No Matching Sales' : 'No Sales History'}
               </h3>
               <p className="text-kaspa-primary-gray mb-4 font-kaspa-body">

@@ -29,9 +29,11 @@ const Header: React.FC = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/dashboard" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 kaspa-gradient rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-kaspa-primary-green/30 transition-all duration-200 transform group-hover:scale-105">
-                <span className="text-white font-bold text-lg font-kaspa-header">K</span>
-              </div>
+              <img 
+                src="/image copy.png" 
+                alt="Kaspa Logo"
+                className="w-10 h-10 transition-all duration-200 transform group-hover:scale-105"
+              />
               <div className="flex flex-col">
                 <span className="text-xl font-bold text-white font-kaspa-header">
                   Kaspa<span className="kaspa-text-gradient">NFT</span>

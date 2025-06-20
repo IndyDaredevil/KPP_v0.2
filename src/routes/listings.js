@@ -13,8 +13,8 @@ const router = express.Router();
 
 // Helper function to extract and flatten image URL from nested token data
 function flattenImageUrl(listing) {
-  if (listing.tokens && listing.tokens.token_images && listing.tokens.token_images.public_url {
-    listing.image_url = listing.tokens.token_images[0].public_url;
+  if (listing.tokens && listing.tokens.token_images && listing.tokens.token_images.public_url) {
+    listing.image_url = listing.tokens.token_images.public_url;
   } else {
     listing.image_url = null;
   }

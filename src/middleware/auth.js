@@ -99,7 +99,6 @@ export const authenticate = async (req, res, next) => {
             .insert({
               id: user.id,
               email: user.email,
-              password: 'managed_by_supabase',
               role: 'user'
             })
             .select('id, email, role')

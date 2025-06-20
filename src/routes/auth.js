@@ -105,7 +105,6 @@ router.post('/register', validateUserRegistration, asyncHandler(async (req, res)
         .upsert({
           id: signUpData.user.id,
           email: signUpData.user.email,
-          password: 'managed_by_supabase', // Placeholder since Supabase manages passwords
           role: 'user'
         }, {
           onConflict: 'email',
@@ -249,7 +248,6 @@ router.post('/login', validateUserLogin, asyncHandler(async (req, res) => {
           .upsert({
             id: data.user.id,
             email: data.user.email,
-            password: 'managed_by_supabase',
             role: 'user'
           }, {
             onConflict: 'email',
@@ -455,7 +453,6 @@ router.get('/me', asyncHandler(async (req, res) => {
           .upsert({
             id: user.id,
             email: user.email,
-            password: 'managed_by_supabase',
             role: 'user'
           }, {
             onConflict: 'email',

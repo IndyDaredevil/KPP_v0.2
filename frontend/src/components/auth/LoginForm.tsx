@@ -43,27 +43,27 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center kaspa-gradient-dark py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">NFT</span>
+          <div className="w-20 h-20 kaspa-gradient rounded-xl flex items-center justify-center mx-auto mb-6 shadow-xl kaspa-glow">
+            <span className="text-white font-bold text-2xl font-kaspa-header">K</span>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Sign in to your account</h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <h2 className="text-3xl font-bold text-white font-kaspa-header">Sign in to your account</h2>
+          <p className="mt-2 text-sm text-kaspa-primary-gray font-kaspa-body">
             Or{' '}
             <Link
               to="/register"
-              className="font-medium text-primary-600 hover:text-primary-500 transition-colors"
+              className="font-medium text-kaspa-secondary-green hover:text-kaspa-primary-green transition-colors"
             >
               create a new account
             </Link>
           </p>
         </div>
 
-        <Card>
+        <Card variant="kaspa" className="shadow-2xl">
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
+            <CardTitle className="kaspa-text-gradient">Welcome back</CardTitle>
             <CardDescription>
               Enter your credentials to access your NFT listings dashboard
             </CardDescription>
@@ -71,7 +71,7 @@ const LoginForm: React.FC = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {loginError && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-md p-4">
                   <div className="flex">
                     <div className="flex-shrink-0">
                       <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -79,10 +79,10 @@ const LoginForm: React.FC = () => {
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">
+                      <h3 className="text-sm font-medium text-red-400 font-kaspa-header">
                         Login Failed
                       </h3>
-                      <div className="mt-2 text-sm text-red-700">
+                      <div className="mt-2 text-sm text-red-300 font-kaspa-body">
                         {getErrorMessage(loginError)}
                       </div>
                     </div>
@@ -127,15 +127,15 @@ const LoginForm: React.FC = () => {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
+                  <div className="w-full border-t border-kaspa-primary-green/30" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Need help?</span>
+                  <span className="px-2 bg-kaspa-accent-medium-blue text-kaspa-primary-gray font-kaspa-body">Need help?</span>
                 </div>
               </div>
 
               <div className="mt-6 text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-kaspa-primary-gray font-kaspa-body">
                   Having trouble signing in? Contact your administrator for assistance.
                 </p>
               </div>
@@ -146,7 +146,7 @@ const LoginForm: React.FC = () => {
         <div className="text-center">
           <Link
             to="/api-test"
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-sm text-kaspa-primary-gray hover:text-kaspa-secondary-green transition-colors font-kaspa-body"
           >
             API Test Page
           </Link>

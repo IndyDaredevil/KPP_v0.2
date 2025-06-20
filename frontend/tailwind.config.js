@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: '#e5e7eb', // gray-200
-        background: '#f9fafb', // gray-50
-        foreground: '#231F20', // Kaspa dark
+        border: '#70C7BA40', // Kaspa green with opacity
+        background: '#0A2540', // Kaspa dark blue
+        foreground: '#FFFFFF', // White text
         ring: '#70C7BA', // Kaspa primary green
-        'card-foreground': '#231F20', // Kaspa dark
+        'card-foreground': '#FFFFFF', // White text on cards
         
         // Kaspa Brand Colors
         kaspa: {

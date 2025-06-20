@@ -23,32 +23,37 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-kaspa-primary-green/20">
+    <header className="bg-kaspa-accent-medium-blue shadow-lg border-b border-kaspa-primary-green/30 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 kaspa-gradient rounded-lg flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-sm font-kaspa-header">K</span>
+            <Link to="/dashboard" className="flex items-center space-x-3 group">
+              <div className="w-10 h-10 kaspa-gradient rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-kaspa-primary-green/30 transition-all duration-200 transform group-hover:scale-105">
+                <span className="text-white font-bold text-lg font-kaspa-header">K</span>
               </div>
-              <span className="text-xl font-bold text-kaspa-primary-dark font-kaspa-header">
-                Kaspa<span className="kaspa-text-gradient">NFT</span>
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-white font-kaspa-header">
+                  Kaspa<span className="kaspa-text-gradient">NFT</span>
+                </span>
+                <span className="text-xs text-kaspa-primary-gray font-kaspa-body -mt-1">
+                  Marketplace Analytics
+                </span>
+              </div>
             </Link>
           </div>
 
           {/* Navigation */}
           {isAuthenticated && (
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden md:flex space-x-1">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors font-kaspa-body ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 font-kaspa-body ${
                     isActive(item.href)
-                      ? 'bg-kaspa-secondary-green/10 text-kaspa-primary-green border-b-2 border-kaspa-primary-green'
-                      : 'text-kaspa-primary-gray hover:text-kaspa-primary-green hover:bg-kaspa-secondary-green/5'
+                      ? 'bg-kaspa-primary-green/20 text-kaspa-secondary-green border border-kaspa-primary-green/30 shadow-md'
+                      : 'text-kaspa-primary-gray hover:text-kaspa-secondary-green hover:bg-kaspa-primary-green/10 hover:border hover:border-kaspa-primary-green/20'
                   }`}
                 >
                   {item.name}
@@ -62,14 +67,14 @@ const Header: React.FC = () => {
             {isAuthenticated && user ? (
               <>
                 <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-sm font-medium text-kaspa-primary-dark font-kaspa-body">{user.email}</span>
-                  <span className="text-xs text-kaspa-primary-gray capitalize kaspa-badge">{user.role}</span>
+                  <span className="text-sm font-medium text-white font-kaspa-body">{user.email}</span>
+                  <span className="kaspa-badge text-xs">{user.role}</span>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-kaspa-primary-gray hover:text-kaspa-primary-dark"
+                  className="text-kaspa-primary-gray hover:text-white"
                 >
                   Sign out
                 </Button>
@@ -94,7 +99,7 @@ const Header: React.FC = () => {
 
       {/* Mobile navigation */}
       {isAuthenticated && (
-        <div className="md:hidden border-t border-kaspa-primary-green/20">
+        <div className="md:hidden border-t border-kaspa-primary-green/20 bg-kaspa-accent-dark-blue/50">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navigation.map((item) => (
               <Link
@@ -102,8 +107,8 @@ const Header: React.FC = () => {
                 to={item.href}
                 className={`block px-3 py-2 rounded-md text-base font-medium transition-colors font-kaspa-body ${
                   isActive(item.href)
-                    ? 'bg-kaspa-secondary-green/10 text-kaspa-primary-green'
-                    : 'text-kaspa-primary-gray hover:text-kaspa-primary-green hover:bg-kaspa-secondary-green/5'
+                    ? 'bg-kaspa-primary-green/20 text-kaspa-secondary-green'
+                    : 'text-kaspa-primary-gray hover:text-kaspa-secondary-green hover:bg-kaspa-primary-green/10'
                 }`}
               >
                 {item.name}

@@ -65,20 +65,20 @@ const HistoricalListingsPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      sold: { color: 'bg-green-100 text-green-800', icon: '💰', label: 'Sold' },
-      cancelled: { color: 'bg-yellow-100 text-yellow-800', icon: '❌', label: 'Cancelled' },
-      expired: { color: 'bg-gray-100 text-gray-800', icon: '⏰', label: 'Expired' },
-      manually_removed: { color: 'bg-red-100 text-red-800', icon: '🗑️', label: 'Manually Removed' },
-      api_sync_removed: { color: 'bg-blue-100 text-blue-800', icon: '🔄', label: 'API Sync Removed' },
-      price_changed: { color: 'bg-purple-100 text-purple-800', icon: '💱', label: 'Price Changed' },
-      manually_updated: { color: 'bg-orange-100 text-orange-800', icon: '✏️', label: 'Manually Updated' },
-      unknown: { color: 'bg-gray-100 text-gray-600', icon: '❓', label: 'Unknown' }
+      sold: { color: 'bg-kaspa-secondary-green/20 text-kaspa-secondary-green border-kaspa-secondary-green/30', icon: '💰', label: 'Sold' },
+      cancelled: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: '❌', label: 'Cancelled' },
+      expired: { color: 'bg-kaspa-primary-gray/20 text-kaspa-primary-gray border-kaspa-primary-gray/30', icon: '⏰', label: 'Expired' },
+      manually_removed: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: '🗑️', label: 'Manually Removed' },
+      api_sync_removed: { color: 'bg-kaspa-accent-teal/20 text-kaspa-accent-teal border-kaspa-accent-teal/30', icon: '🔄', label: 'API Sync Removed' },
+      price_changed: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: '💱', label: 'Price Changed' },
+      manually_updated: { color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: '✏️', label: 'Manually Updated' },
+      unknown: { color: 'bg-kaspa-primary-gray/20 text-kaspa-primary-gray border-kaspa-primary-gray/30', icon: '❓', label: 'Unknown' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unknown;
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border font-kaspa-body ${config.color}`}>
         <span className="mr-1">{config.icon}</span>
         {config.label}
       </span>
@@ -88,11 +88,11 @@ const HistoricalListingsPage: React.FC = () => {
   const SortButton = ({ field, children }: { field: string; children: React.ReactNode }) => (
     <button
       onClick={() => handleSortChange(field)}
-      className="flex items-center space-x-1 text-xs font-medium text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors"
+      className="flex items-center space-x-1 text-xs font-medium text-kaspa-primary-gray uppercase tracking-wider hover:text-kaspa-secondary-green transition-colors font-kaspa-subheader"
     >
       <span>{children}</span>
       {filters.sortBy === field && (
-        <span className="text-primary-600">
+        <span className="text-kaspa-primary-green">
           {filters.sortOrder === 'asc' ? '↑' : '↓'}
         </span>
       )}
@@ -100,14 +100,14 @@ const HistoricalListingsPage: React.FC = () => {
   );
 
   const HistoricalListingRow = ({ listing }: { listing: HistoricalListing }) => (
-    <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+    <tr className="border-b border-kaspa-primary-green/10 hover:bg-kaspa-primary-green/5 transition-colors">
       <td className="py-3 px-4">
         <div className="flex items-center space-x-3">
           {listing.image_url ? (
             <img 
               src={listing.image_url} 
               alt={`${listing.ticker} #${listing.token_id}`}
-              className="w-10 h-10 rounded-lg object-cover"
+              className="w-10 h-10 rounded-lg object-cover border border-kaspa-primary-green/20"
               onError={(e) => {
                 // Fallback to placeholder if image fails to load
                 const target = e.target as HTMLImageElement;
@@ -119,46 +119,46 @@ const HistoricalListingsPage: React.FC = () => {
               }}
             />
           ) : null}
-          <div className={`w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-700 rounded-lg flex items-center justify-center ${listing.image_url ? 'hidden' : ''}`}>
-            <span className="text-white font-bold text-sm">{listing.ticker.slice(0, 2)}</span>
+          <div className={`w-10 h-10 bg-gradient-to-br from-kaspa-primary-gray to-gray-700 rounded-lg flex items-center justify-center shadow-md ${listing.image_url ? 'hidden' : ''}`}>
+            <span className="text-white font-bold text-sm font-kaspa-header">{listing.ticker.slice(0, 2)}</span>
           </div>
           <div>
-            <div className="font-medium text-gray-900">{listing.ticker}</div>
-            <div className="text-sm text-gray-500">Token #{listing.token_id}</div>
+            <div className="font-medium text-white font-kaspa-body">{listing.ticker}</div>
+            <div className="text-sm text-kaspa-primary-gray font-kaspa-body">Token #{listing.token_id}</div>
           </div>
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-sm font-medium text-white font-kaspa-body">
           {formatPrice(Number(listing.total_price))}
         </div>
         {listing.required_kaspa && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-kaspa-primary-gray font-kaspa-body">
             {Number(listing.required_kaspa).toLocaleString()} KAS
           </div>
         )}
       </td>
       <td className="py-3 px-4">
         {listing.rarity_rank ? (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+          <span className="kaspa-badge">
             #{listing.rarity_rank}
           </span>
         ) : (
-          <span className="text-gray-400 text-sm">-</span>
+          <span className="text-kaspa-primary-gray text-sm">-</span>
         )}
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-900">
+        <div className="text-sm text-white font-kaspa-body">
           {truncateAddress(listing.seller_wallet_address)}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
           {listing.created_at ? formatDate(listing.created_at) : '-'}
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
           {formatDate(listing.deactivated_at || '')}
         </div>
       </td>
@@ -166,10 +166,10 @@ const HistoricalListingsPage: React.FC = () => {
         {getStatusBadge(listing.status)}
       </td>
       <td className="py-3 px-4">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-kaspa-body ${
           listing.source === 'kaspa_api' 
-            ? 'bg-blue-100 text-blue-800' 
-            : 'bg-green-100 text-green-800'
+            ? 'bg-kaspa-secondary-green/10 text-kaspa-primary-green border border-kaspa-primary-green/20' 
+            : 'bg-kaspa-secondary-green text-white'
         }`}>
           {listing.source === 'kaspa_api' ? 'API' : 'Manual'}
         </span>
@@ -199,9 +199,9 @@ const HistoricalListingsPage: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Historical Data</h3>
-          <p className="text-red-600 mb-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+          <h3 className="text-lg font-medium text-red-400 mb-2 font-kaspa-header">Error Loading Historical Data</h3>
+          <p className="text-red-300 mb-4 font-kaspa-body">
             Failed to load historical listings data. Please try refreshing the page.
           </p>
           <Button onClick={() => refetch()} variant="outline">
@@ -217,8 +217,8 @@ const HistoricalListingsPage: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Historical Listings</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-white font-kaspa-header">Historical Listings</h1>
+          <p className="text-kaspa-primary-gray mt-1 font-kaspa-body">
             Review past NFT listings and marketplace activity with full change history
           </p>
         </div>
@@ -226,77 +226,77 @@ const HistoricalListingsPage: React.FC = () => {
 
       {/* Summary Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Listings</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Total Listings</CardTitle>
             <span className="text-2xl">📊</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{stats.total.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">All historical records</p>
+            <div className="kaspa-stat-value">{stats.total.toLocaleString()}</div>
+            <p className="kaspa-stat-label">All historical records</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Value</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Total Value</CardTitle>
             <span className="text-2xl">💰</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPrice(stats.totalValue)}</div>
-            <p className="text-xs text-gray-500 mt-1">Combined listing value</p>
+            <div className="kaspa-stat-value">{formatPrice(stats.totalValue)}</div>
+            <p className="kaspa-stat-label">Combined listing value</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Sold</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Sold</CardTitle>
             <span className="text-2xl">✅</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.sold.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Successfully sold</p>
+            <div className="text-2xl font-bold text-kaspa-secondary-green font-kaspa-header">{stats.sold.toLocaleString()}</div>
+            <p className="kaspa-stat-label">Successfully sold</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Cancelled</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Cancelled</CardTitle>
             <span className="text-2xl">❌</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.cancelled.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Cancelled by seller</p>
+            <div className="text-2xl font-bold text-yellow-400 font-kaspa-header">{stats.cancelled.toLocaleString()}</div>
+            <p className="kaspa-stat-label">Cancelled by seller</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Price Changed</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Price Changed</CardTitle>
             <span className="text-2xl">💱</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats.priceChanged.toLocaleString()}</div>
-            <p className="text-xs text-gray-500 mt-1">Price/detail changes</p>
+            <div className="text-2xl font-bold text-purple-400 font-kaspa-header">{stats.priceChanged.toLocaleString()}</div>
+            <p className="kaspa-stat-label">Price/detail changes</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card variant="kaspa" className="hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Avg. Price</CardTitle>
+            <CardTitle className="text-sm font-medium text-kaspa-primary-gray font-kaspa-body">Avg. Price</CardTitle>
             <span className="text-2xl">📈</span>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{formatPrice(stats.averagePrice)}</div>
-            <p className="text-xs text-gray-500 mt-1">Average listing price</p>
+            <div className="kaspa-stat-value">{formatPrice(stats.averagePrice)}</div>
+            <p className="kaspa-stat-label">Average listing price</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card variant="kaspa">
         <CardHeader>
-          <CardTitle>Filters & Search</CardTitle>
+          <CardTitle className="kaspa-text-gradient">Filters & Search</CardTitle>
           <CardDescription>
             Filter and search through historical listings with full change history
           </CardDescription>
@@ -316,7 +316,7 @@ const HistoricalListingsPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
+              <label className="text-sm font-medium text-white block mb-2 font-kaspa-body">
                 Status
               </label>
               <select
@@ -336,7 +336,7 @@ const HistoricalListingsPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
+              <label className="text-sm font-medium text-white block mb-2 font-kaspa-body">
                 Items per page
               </label>
               <select
@@ -381,11 +381,11 @@ const HistoricalListingsPage: React.FC = () => {
       </Card>
 
       {/* Historical Listings Table */}
-      <Card>
+      <Card variant="kaspa">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>
+              <CardTitle className="kaspa-text-gradient">
                 Historical Listings ({pagination?.total?.toLocaleString() || 0})
               </CardTitle>
               <CardDescription>
@@ -397,16 +397,16 @@ const HistoricalListingsPage: React.FC = () => {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              <span className="ml-3 text-gray-600">Loading historical data...</span>
+              <div className="spinner"></div>
+              <span className="ml-3 text-kaspa-primary-gray font-kaspa-body">Loading historical data...</span>
             </div>
           ) : listings.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📚</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-white mb-2 font-kaspa-header">
                 {searchTokenId || statusFilter ? 'No Matching Records' : 'No Historical Data'}
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-kaspa-primary-gray mb-4 font-kaspa-body">
                 {searchTokenId || statusFilter
                   ? 'No historical listings match your current filters. Try adjusting your search criteria.'
                   : 'No historical listings found. Historical data will appear here once listings are deactivated.'
@@ -416,7 +416,7 @@ const HistoricalListingsPage: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-kaspa-primary-green/5">
                   <tr>
                     <th className="py-3 px-4 text-left">
                       <SortButton field="ticker">NFT</SortButton>
@@ -444,7 +444,7 @@ const HistoricalListingsPage: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white">
+                <tbody className="bg-kaspa-accent-medium-blue/50">
                   {listings.map((listing: HistoricalListing) => (
                     <HistoricalListingRow key={listing.id} listing={listing} />
                   ))}
@@ -457,10 +457,10 @@ const HistoricalListingsPage: React.FC = () => {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <Card>
+        <Card variant="kaspa">
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-kaspa-primary-gray font-kaspa-body">
                 Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                 {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                 {pagination.total} results
@@ -486,10 +486,10 @@ const HistoricalListingsPage: React.FC = () => {
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
                         disabled={isLoading}
-                        className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                        className={`px-3 py-1 text-sm rounded-md transition-colors font-kaspa-body ${
                           pageNum === pagination.page
-                            ? 'bg-primary-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-kaspa-primary-green text-kaspa-accent-dark-blue'
+                            : 'text-kaspa-primary-gray hover:bg-kaspa-primary-green/20 hover:text-kaspa-secondary-green'
                         }`}
                       >
                         {pageNum}

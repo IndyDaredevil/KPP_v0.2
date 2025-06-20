@@ -31,20 +31,20 @@ function ToastComponent({ id, type, title, message, duration = 4000, onClose }: 
   };
 
   const colors = {
-    success: 'bg-green-500/10 border-green-500/20 text-green-400',
+    success: 'bg-kaspa-secondary-green/10 border-kaspa-secondary-green/20 text-kaspa-secondary-green',
     error: 'bg-red-500/10 border-red-500/20 text-red-400',
-    info: 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+    info: 'bg-kaspa-accent-teal/10 border-kaspa-accent-teal/20 text-kaspa-accent-teal'
   };
 
   const Icon = icons[type];
 
   return (
-    <div className={`flex items-start space-x-3 p-4 rounded-lg border ${colors[type]} animate-in slide-in-from-right duration-300 shadow-lg backdrop-blur-sm`}>
+    <div className={`flex items-start space-x-3 p-4 rounded-lg border ${colors[type]} animate-in slide-in-from-right duration-300 shadow-lg backdrop-blur-sm bg-kaspa-accent-medium-blue/90`}>
       <Icon size={20} className="flex-shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="font-medium">{title}</p>
+        <p className="font-medium font-kaspa-body">{title}</p>
         {message && (
-          <p className="text-sm opacity-90 mt-1">{message}</p>
+          <p className="text-sm opacity-90 mt-1 font-kaspa-body">{message}</p>
         )}
       </div>
       <button

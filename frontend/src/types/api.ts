@@ -53,6 +53,9 @@ export interface Listing {
   created_at?: string;
   updated_at?: string;
   
+  // NEW: Image URL field from the backend
+  image_url?: string | null;
+  
   // Expanded status field to include history-preserving statuses
   status: 'active' | 'sold' | 'cancelled' | 'expired' | 'manually_removed' | 'api_sync_removed' | 'price_changed' | 'manually_updated' | 'unknown';
   

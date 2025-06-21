@@ -42,16 +42,32 @@ async function runManualSync() {
   validateEnvironment();
 
   if (syncOwners) {
+    console.log('🧑‍🤝‍🧑 ========================================');
+    console.log('🧑‍🤝‍🧑 STARTING KASPUNK OWNERS SYNC');
+    console.log('🧑‍🤝‍🧑 ========================================');
     console.log('Starting Kaspunk owners sync...');
     console.log('📅 Started at:', new Date().toISOString());
+    console.log('🔧 This will fetch all KasPunk token ownership data from the Kaspa API');
+    console.log('🔧 and update the database with current ownership information');
+    console.log('');
 
     try {
       const startTime = Date.now();
+      console.log('⏱️  Sync start time recorded:', startTime);
+      console.log('🚀 Calling syncKaspunkOwners() function...');
+      
       const result = await syncKaspunkOwners();
+      
       const endTime = Date.now();
       const duration = endTime - startTime;
+      console.log('⏱️  Sync end time recorded:', endTime);
+      console.log('⏱️  Total sync duration:', duration, 'ms');
 
-      console.log('\n✅ Kaspunk owners sync completed!');
+      console.log('');
+      console.log('🧑‍🤝‍🧑 ========================================');
+      console.log('🧑‍🤝‍🧑 KASPUNK OWNERS SYNC COMPLETED');
+      console.log('🧑‍🤝‍🧑 ========================================');
+      console.log('✅ Kaspunk owners sync completed!');
       console.log('Results:', {
         totalHolders: result.totalHolders,
         processedHolders: result.processedHolders,
@@ -62,13 +78,18 @@ async function runManualSync() {
       });
 
       if (result.action === 'error') {
-        console.log(`Error: ${result.error}`);
+        console.log('❌ Error occurred during sync:', result.error);
       } else {
-        console.log(`Successfully processed ${result.processedHolders} holders (${result.addedHolders} added, ${result.updatedHolders} updated)`);
+        console.log(`✅ Successfully processed ${result.processedHolders} holders (${result.addedHolders} added, ${result.updatedHolders} updated)`);
       }
 
     } catch (error) {
-      console.error('Kaspunk owners sync failed:', error.message);
+      console.log('');
+      console.log('🧑‍🤝‍🧑 ========================================');
+      console.log('🧑‍🤝‍🧑 KASPUNK OWNERS SYNC FAILED');
+      console.log('🧑‍🤝‍🧑 ========================================');
+      console.error('❌ Kaspunk owners sync failed:', error.message);
+      console.error('❌ Full error details:', error);
       logger.error('Kaspunk owners sync failed:', error);
       process.exit(1);
     }

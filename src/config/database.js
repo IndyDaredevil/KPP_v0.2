@@ -93,7 +93,6 @@ const createWebContainerFetch = (apiKey) => {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Host': hostname,
         ...options.headers
       };
       
@@ -477,8 +476,7 @@ export async function checkSupabaseConnectivity() {
           'Authorization': `Bearer ${supabaseKey}`,
           'User-Agent': 'nft-listings-webcontainer/1.0.0',
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Host': hostname
+          'Cache-Control': 'no-cache'
         },
         cache: 'no-cache',
         mode: 'cors',

@@ -76,9 +76,8 @@ const createWebContainerFetch = (apiKey) => {
         keepalive: false,
         cache: 'no-cache',
         mode: 'cors',
-        credentials: 'omit',
-        // Force IPv4 resolution to avoid IPv6 issues in WebContainer
-        family: 4
+        credentials: 'omit'
+        // Removed family: 4 option that was causing localhost routing issues
       };
 
       const response = await fetch(url, fetchOptions);

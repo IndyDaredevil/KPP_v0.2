@@ -40,6 +40,8 @@ class KaspunkOwnershipSyncService {
       console.log('   - Request delay:', this.requestDelay + 'ms');
       console.log('   - Batch delay:', this.batchDelay + 'ms');
       console.log('   - Max retries:', this.maxRetries);
+      console.log('   - Database retry attempts: 10 (increased from 5)');
+      console.log('   - Database retry delay: 5000ms (increased from 3000ms)');
       console.log('');
 
       logger.info('🔍 Starting KasPunk token ownership sync (WebContainer optimized)...');
@@ -366,13 +368,13 @@ class KaspunkOwnershipSyncService {
     // Enhanced logging before database operation
     logger.debug('🗄️ [DATABASE] Starting token ownership table clear operation');
     
-    // Use enhanced retry with longer delays for WebContainer
+    // INCREASED: Use enhanced retry with longer delays for WebContainer
     const { error: deleteOwnershipError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_token_ownership')
         .delete()
         .neq('token_id', 0); // Delete all records
-    }, 5, 3000); // 5 retries with 3 second base delay
+    }, 10, 5000); // INCREASED: 10 retries with 5 second base delay (was 5, 3000)
 
     if (deleteOwnershipError) {
       console.log('⚠️ Warning: Failed to clear existing ownership data:', deleteOwnershipError.message);
@@ -405,12 +407,12 @@ class KaspunkOwnershipSyncService {
         totalRecords: allOwnershipData.length
       });
 
-      // Use enhanced retry with longer delays for WebContainer
+      // INCREASED: Use enhanced retry with longer delays for WebContainer
       const { error: insertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .insert(batch);
-      }, 5, 3000); // 5 retries with 3 second base delay
+      }, 10, 5000); // INCREASED: 10 retries with 5 second base delay (was 5, 3000)
 
       if (insertError) {
         console.log(`❌ Error inserting ownership batch ${batchNumber}:`, insertError.message);
@@ -462,13 +464,13 @@ class KaspunkOwnershipSyncService {
     // Enhanced logging before database operation
     logger.debug('🗄️ [DATABASE] Starting kaspunk_owners table clear operation');
     
-    // Use enhanced retry with longer delays for WebContainer
+    // INCREASED: Use enhanced retry with longer delays for WebContainer
     const { error: deleteOwnersError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_owners')
         .delete()
         .neq('wallet_address', ''); // Delete all records
-    }, 5, 3000); // 5 retries with 3 second base delay
+    }, 10, 5000); // INCREASED: 10 retries with 5 second base delay (was 5, 3000)
 
     if (deleteOwnersError) {
       console.log('⚠️ Warning: Failed to clear existing owners data:', deleteOwnersError.message);
@@ -510,12 +512,12 @@ class KaspunkOwnershipSyncService {
         totalOwners: ownerRecords.length
       });
 
-      // Use enhanced retry with longer delays for WebContainer
+      // INCREASED: Use enhanced retry with longer delays for WebContainer
       const { error: insertOwnersError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_owners')
           .insert(batch);
-      }, 5, 3000); // 5 retries with 3 second base delay
+      }, 10, 5000); // INCREASED: 10 retries with 5 second base delay (was 5, 3000)
 
       if (insertOwnersError) {
         console.log(`❌ Error inserting owners batch ${batchNumber}:`, insertOwnersError.message);
@@ -573,7 +575,7 @@ class KaspunkOwnershipSyncService {
       averageHolding: averageHolding.toFixed(2)
     });
 
-    // Use enhanced retry with longer delays for WebContainer
+    // INCREASED: Use enhanced retry with longer delays for WebContainer
     const { error: statsError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_collection_stats')
@@ -581,7 +583,7 @@ class KaspunkOwnershipSyncService {
           onConflict: 'id',
           ignoreDuplicates: false
         });
-    }, 5, 3000); // 5 retries with 3 second base delay
+    }, 10, 5000); // INCREASED: 10 retries with 5 second base delay (was 5, 3000)
 
     if (statsError) {
       console.log('❌ Error updating collection statistics:', statsError.message);

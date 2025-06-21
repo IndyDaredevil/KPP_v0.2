@@ -38,7 +38,10 @@ class KaspunkOwnershipSyncService {
     try {
       logger.info('🔍 Starting KasPunk token ownership sync (one record per token_id)...');
 
-      // Step 1: Fetch all ownership data from Kaspa API
+      // Step 1: Check current table state
+      await this.checkCurrentTableState();
+
+      // Step 2: Fetch all ownership data from Kaspa API
       const allOwnershipData = await this.fetchAllOwnershipData();
       
       if (allOwnershipData.length === 0) {
@@ -47,10 +50,13 @@ class KaspunkOwnershipSyncService {
 
       logger.info(`📊 Total ownership records collected: ${allOwnershipData.length}`);
 
-      // Step 2: Deduplicate by token_id (should be 1000 unique records)
+      // Step 3: Deduplicate by token_id (should be 1000 unique records)
       const deduplicatedData = this.deduplicateByTokenId(allOwnershipData);
 
-      // Step 3: Upsert token ownership data
+      // Step 4: Show sample data for debugging
+      this.logSampleData(deduplicatedData);
+
+      // Step 5: Upsert token ownership data
       await this.upsertTokenOwnershipTable(deduplicatedData);
 
       // Calculate final statistics
@@ -81,6 +87,52 @@ class KaspunkOwnershipSyncService {
       };
 
       throw errorResult;
+    }
+  }
+
+  /**
+   * Check current table state for debugging
+   */
+  async checkCurrentTableState() {
+    try {
+      logger.info('🔍 Checking current table state...');
+      
+      const { count: currentCount, error: countError } = await retrySupabaseCall(async () => {
+        return await supabaseAdmin
+          .from('kaspunk_token_ownership')
+          .select('*', { count: 'exact', head: true });
+      }, 3, 2000);
+
+      if (countError) {
+        logger.warn('⚠️ Could not check current table state:', countError.message);
+      } else {
+        logger.info(`📊 Current table has ${currentCount || 0} records`);
+        
+        // Get a few sample records to see the structure
+        const { data: sampleRecords, error: sampleError } = await retrySupabaseCall(async () => {
+          return await supabaseAdmin
+            .from('kaspunk_token_ownership')
+            .select('token_id, wallet_address')
+            .limit(3);
+        }, 3, 2000);
+
+        if (!sampleError && sampleRecords && sampleRecords.length > 0) {
+          logger.info('📋 Sample existing records:', sampleRecords);
+        }
+      }
+    } catch (error) {
+      logger.warn('⚠️ Error checking table state:', error.message);
+    }
+  }
+
+  /**
+   * Log sample data for debugging
+   */
+  logSampleData(data) {
+    if (data && data.length > 0) {
+      const sampleSize = Math.min(3, data.length);
+      const samples = data.slice(0, sampleSize);
+      logger.info(`📋 Sample data to upsert (first ${sampleSize} records):`, samples);
     }
   }
 
@@ -298,23 +350,38 @@ class KaspunkOwnershipSyncService {
         updated_at: new Date().toISOString()
       }));
 
-      // Use upsert with conflict resolution on token_id (matches unique_token_id constraint)
-      const { error: upsertError } = await retrySupabaseCall(async () => {
-        return await supabaseAdmin
-          .from('kaspunk_token_ownership')
-          .upsert(batchWithTimestamps, {
-            onConflict: 'token_id',
-            ignoreDuplicates: false
+      logger.debug(`🔍 Sample batch data:`, batchWithTimestamps.slice(0, 2));
+
+      try {
+        // Use upsert with conflict resolution on token_id (matches unique_token_id constraint)
+        const { error: upsertError } = await retrySupabaseCall(async () => {
+          return await supabaseAdmin
+            .from('kaspunk_token_ownership')
+            .upsert(batchWithTimestamps, {
+              onConflict: 'token_id',
+              ignoreDuplicates: false
+            });
+        }, 1, 1000); // Reduced retries for faster debugging
+
+        if (upsertError) {
+          logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, {
+            error: upsertError,
+            batchSize: batch.length,
+            sampleData: batchWithTimestamps.slice(0, 2)
           });
-      }, 3, 2000);
+          throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
+        }
 
-      if (upsertError) {
-        logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, upsertError);
-        throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
+        upsertedCount += batch.length;
+        logger.debug(`✅ Ownership batch ${batchNumber} upserted successfully`);
+
+      } catch (error) {
+        logger.error(`❌ Critical error in batch ${batchNumber}:`, {
+          error: error.message,
+          batchData: batchWithTimestamps.slice(0, 2)
+        });
+        throw error;
       }
-
-      upsertedCount += batch.length;
-      logger.debug(`✅ Ownership batch ${batchNumber} upserted successfully`);
 
       // Delay between batches
       if (batchNumber < totalBatches) {

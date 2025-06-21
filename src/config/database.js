@@ -38,22 +38,51 @@ logger.info('Supabase environment variables validated successfully', {
   serviceKeyPrefix: `${supabaseServiceRoleKey.substring(0, 20)}...`
 });
 
-// WebContainer-optimized fetch wrapper with DNS resolution fixes
+// WebContainer DNS routing detection and workaround
+let dnsRoutingIssueDetected = false;
+let consecutiveRoutingErrors = 0;
+const MAX_ROUTING_ERRORS = 3;
+
+// WebContainer-optimized fetch wrapper with DNS routing workaround
 const createWebContainerFetch = (apiKey) => {
   return async (url, options = {}) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     try {
-      // Extract hostname from URL for DNS debugging
       const urlObj = new URL(url);
       const hostname = urlObj.hostname;
       
-      // Log DNS resolution attempt
+      // If we've detected persistent DNS routing issues, try alternative approaches
+      if (dnsRoutingIssueDetected && consecutiveRoutingErrors >= MAX_ROUTING_ERRORS) {
+        logger.warn('🔄 [DNS WORKAROUND] Attempting alternative fetch configuration due to persistent routing issues');
+        
+        // Try with minimal configuration to bypass WebContainer routing issues
+        const minimalResponse = await fetch(url, {
+          method: options.method || 'GET',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: options.body,
+          signal: controller.signal
+        });
+        
+        if (minimalResponse.ok) {
+          logger.info('✅ [DNS WORKAROUND] Alternative fetch configuration successful');
+          consecutiveRoutingErrors = 0;
+          dnsRoutingIssueDetected = false;
+          return minimalResponse;
+        }
+      }
+      
       logger.networkDebug('DNS resolution attempt', {
         hostname,
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
-        isSupabaseUrl: hostname.includes('supabase.co')
+        isSupabaseUrl: hostname.includes('supabase.co'),
+        routingIssueDetected: dnsRoutingIssueDetected,
+        consecutiveErrors: consecutiveRoutingErrors
       });
 
       const headers = {
@@ -64,12 +93,10 @@ const createWebContainerFetch = (apiKey) => {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        // Add DNS resolution hints
         'Host': hostname,
         ...options.headers
       };
       
-      // Enhanced logging before fetch call
       logger.networkDebug('Supabase fetch request', {
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
         method: options.method || 'GET',
@@ -81,22 +108,27 @@ const createWebContainerFetch = (apiKey) => {
         userAgent: headers['User-Agent']
       });
       
-      // WebContainer-specific fetch configuration with DNS fixes
       const fetchOptions = {
         ...options,
         signal: controller.signal,
         headers,
-        // WebContainer-specific optimizations
         keepalive: false,
         cache: 'no-cache',
         mode: 'cors',
         credentials: 'omit'
-        // Removed family: 4 option as it causes DNS routing issues with fetch API
       };
 
       const response = await fetch(url, fetchOptions);
       
-      // Log successful response with connection details
+      // Reset error counters on successful response
+      if (response.ok) {
+        consecutiveRoutingErrors = 0;
+        if (dnsRoutingIssueDetected) {
+          logger.info('✅ [DNS RECOVERY] DNS routing issue appears to be resolved');
+          dnsRoutingIssueDetected = false;
+        }
+      }
+      
       logger.networkDebug('Supabase fetch response', {
         status: response.status,
         statusText: response.statusText,
@@ -108,10 +140,41 @@ const createWebContainerFetch = (apiKey) => {
       
       return response;
     } catch (error) {
-      // Enhanced error logging with network diagnostics
       const urlObj = new URL(url);
       const hostname = urlObj.hostname;
       
+      // Detect DNS routing issues
+      const isLocalhostRouting = error.cause?.socket?.remoteAddress === '127.0.0.1';
+      const isSocketError = error.cause?.code === 'UND_ERR_SOCKET';
+      
+      if (isLocalhostRouting || (isSocketError && error.message?.includes('fetch failed'))) {
+        consecutiveRoutingErrors++;
+        dnsRoutingIssueDetected = true;
+        
+        logger.error('🌐 [NETWORK] WebContainer DNS routing issue detected', {
+          url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+          hostname,
+          method: options.method || 'GET',
+          errorName: error.name,
+          errorMessage: error.message,
+          errorCode: error.code,
+          consecutiveErrors: consecutiveRoutingErrors,
+          isLocalhostRouting,
+          remoteAddress: error.cause?.socket?.remoteAddress,
+          localAddress: error.cause?.socket?.localAddress
+        });
+        
+        // Create a more descriptive error for WebContainer DNS issues
+        const routingError = new Error(`WebContainer network connectivity issue: Unable to reach ${hostname}. This appears to be a temporary WebContainer networking problem.`);
+        routingError.code = 'WEBCONTAINER_CONNECTIVITY_ERROR';
+        routingError.hostname = hostname;
+        routingError.isTemporary = true;
+        routingError.consecutiveErrors = consecutiveRoutingErrors;
+        routingError.originalError = error;
+        throw routingError;
+      }
+      
+      // Handle other network errors
       logger.error('🌐 [NETWORK] Supabase fetch failed', {
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
         hostname,
@@ -121,33 +184,10 @@ const createWebContainerFetch = (apiKey) => {
         errorCode: error.code,
         errorCause: error.cause,
         stack: error.stack?.substring(0, 500),
-        // WebContainer-specific debugging
         isAbortError: error.name === 'AbortError',
         isNetworkError: error.message?.includes('fetch failed'),
-        isSocketError: error.cause?.code === 'UND_ERR_SOCKET',
-        // DNS resolution debugging
-        isDnsError: error.message?.includes('getaddrinfo'),
-        isLocalhostRouting: error.cause?.socket?.remoteAddress === '127.0.0.1'
+        isSocketError: error.cause?.code === 'UND_ERR_SOCKET'
       });
-      
-      // Transform WebContainer-specific errors with better diagnostics
-      if (error.cause?.code === 'UND_ERR_SOCKET') {
-        const isLocalhostRouting = error.cause?.socket?.remoteAddress === '127.0.0.1';
-        
-        if (isLocalhostRouting) {
-          const newError = new Error(`WebContainer DNS routing error: Request to ${hostname} was incorrectly routed to localhost (127.0.0.1). This is a WebContainer network configuration issue.`);
-          newError.code = 'WEBCONTAINER_DNS_ROUTING_ERROR';
-          newError.hostname = hostname;
-          newError.originalError = error;
-          throw newError;
-        } else {
-          const newError = new Error(`WebContainer network error: Unable to establish connection to ${hostname}. This may be a temporary network issue.`);
-          newError.code = 'WEBCONTAINER_NETWORK_ERROR';
-          newError.hostname = hostname;
-          newError.originalError = error;
-          throw newError;
-        }
-      }
       
       if (error.name === 'AbortError') {
         const newError = new Error(`Request timeout: Connection to ${hostname} took too long to respond`);
@@ -164,7 +204,7 @@ const createWebContainerFetch = (apiKey) => {
   };
 };
 
-// WebContainer-optimized client configuration with network resilience
+// WebContainer-optimized client configuration with graceful degradation
 const clientConfig = {
   auth: {
     autoRefreshToken: false,
@@ -179,11 +219,9 @@ const clientConfig = {
     },
     fetch: createWebContainerFetch(supabaseKey)
   },
-  // WebContainer-specific database configuration
   db: {
     schema: 'public'
   },
-  // Disable realtime for better stability in WebContainer
   realtime: {
     params: {
       eventsPerSecond: 2
@@ -191,7 +229,6 @@ const clientConfig = {
   }
 };
 
-// Admin client configuration with enhanced error handling
 const adminClientConfig = {
   auth: {
     autoRefreshToken: false,
@@ -219,12 +256,11 @@ const adminClientConfig = {
 export const supabase = createClient(supabaseUrl, supabaseKey, clientConfig);
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, adminClientConfig);
 
-// WebContainer-friendly test connection function with enhanced error handling
+// WebContainer-friendly test connection with graceful degradation
 export async function testConnection() {
   try {
-    logger.info('Testing database connection (WebContainer mode with DNS diagnostics)...');
+    logger.info('Testing database connection (WebContainer mode with connectivity workarounds)...');
     
-    // Use a simpler test that's more likely to work in WebContainer
     const { data, error } = await Promise.race([
       supabase.from('users').select('count', { count: 'exact', head: true }),
       new Promise((_, reject) => 
@@ -233,34 +269,30 @@ export async function testConnection() {
     ]);
 
     if (error) {
-      logger.warn('Database connection test failed (non-critical in WebContainer):', {
+      logger.warn('Database connection test failed (will continue with graceful degradation):', {
         message: error.message,
         code: error.code,
-        isNetworkError: error.message?.includes('fetch failed'),
-        isSocketError: error.message?.includes('UND_ERR_SOCKET'),
-        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+        isConnectivityError: error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR',
+        isTemporary: error.isTemporary
       });
-      // In WebContainer, we'll allow the server to start even if the initial connection fails
       return false;
     }
 
     logger.info('Database connection test successful');
     return true;
   } catch (error) {
-    logger.warn('Database connection test failed (non-critical in WebContainer):', {
+    logger.warn('Database connection test failed (will continue with graceful degradation):', {
       message: error.message,
       name: error.name,
       code: error.code,
       isTimeout: error.message?.includes('timeout'),
-      isNetworkError: error.message?.includes('network'),
-      isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+      isConnectivityError: error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR'
     });
-    // In WebContainer, we'll allow the server to start even if the initial connection fails
     return false;
   }
 }
 
-// Enhanced retry function with DNS routing error handling
+// Enhanced retry function with WebContainer-specific handling
 export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3000) {
   let lastError;
   
@@ -270,7 +302,6 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
       
       const result = await operation();
       
-      // Check if the result contains an error (Supabase pattern)
       if (result && typeof result === 'object' && result.error) {
         const error = new Error(result.error.message || 'Supabase operation failed');
         error.code = result.error.code;
@@ -293,7 +324,6 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
     } catch (error) {
       lastError = error;
       
-      // Enhanced error logging with DNS routing diagnostics
       logger.error(`❌ [SUPABASE] Attempt ${attempt}/${maxRetries} failed`, {
         errorName: error.name,
         errorMessage: error.message,
@@ -302,21 +332,21 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
         errorHint: error.hint,
         errorStack: error.stack?.substring(0, 300),
         supabaseError: error.supabaseError,
-        isWebContainerNetworkError: error.code === 'WEBCONTAINER_NETWORK_ERROR',
-        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR',
+        isWebContainerConnectivityError: error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR',
         isTimeoutError: error.code === 'TIMEOUT_ERROR',
-        hostname: error.hostname
+        hostname: error.hostname,
+        consecutiveErrors: error.consecutiveErrors,
+        isTemporary: error.isTemporary
       });
       
-      // Check if it's a retryable error
       const shouldRetry = isRetryableSupabaseError(error);
       
-      // Special handling for DNS routing errors
-      if (error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR') {
-        logger.error(`🚨 [DNS] Critical DNS routing issue detected - requests to ${error.hostname} are being routed to localhost`);
+      // Special handling for WebContainer connectivity issues
+      if (error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR') {
+        logger.warn(`🔄 [WEBCONTAINER] Connectivity issue detected (attempt ${attempt}/${maxRetries})`);
         
         if (attempt === maxRetries) {
-          logger.error(`🚫 [DNS] DNS routing issue persists after ${maxRetries} attempts. This requires WebContainer network configuration fixes.`);
+          logger.error(`🚫 [WEBCONTAINER] Connectivity issues persist after ${maxRetries} attempts. Operations may be degraded.`);
         }
       }
       
@@ -327,15 +357,21 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
           hostname: error.hostname,
           finalAttempt: true,
           shouldRetry,
-          maxRetriesReached: attempt === maxRetries
+          maxRetriesReached: attempt === maxRetries,
+          isConnectivityIssue: error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR'
         });
         throw error;
       }
       
-      // Exponential backoff with longer delays for DNS issues
-      const delay = error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR' 
-        ? Math.min(baseDelay * Math.pow(2, attempt - 1), 15000)
-        : Math.min(baseDelay * Math.pow(1.5, attempt - 1), 10000);
+      // Adaptive delay based on error type
+      let delay = baseDelay * Math.pow(1.5, attempt - 1);
+      
+      if (error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR') {
+        // Longer delays for connectivity issues
+        delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 15000);
+      } else {
+        delay = Math.min(delay, 10000);
+      }
       
       logger.warn(`🔄 [SUPABASE] Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`, {
         error: error.message,
@@ -345,8 +381,8 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
         maxRetries,
         delay,
         shouldRetry,
-        isNetworkIssue: error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR',
-        isDnsIssue: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+        isConnectivityIssue: error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR',
+        isTemporary: error.isTemporary
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -356,7 +392,7 @@ export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3
   throw lastError;
 }
 
-// Enhanced error detection with DNS routing error handling
+// Enhanced error detection with WebContainer-specific handling
 function isRetryableSupabaseError(error) {
   // Don't retry authentication/authorization errors
   if (error.message && (
@@ -378,14 +414,13 @@ function isRetryableSupabaseError(error) {
     return false;
   }
 
-  // Always retry WebContainer-specific network errors (including DNS routing)
-  if (error.code === 'WEBCONTAINER_NETWORK_ERROR' || 
-      error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR' || 
+  // Always retry WebContainer connectivity errors (they're often temporary)
+  if (error.code === 'WEBCONTAINER_CONNECTIVITY_ERROR' || 
       error.code === 'TIMEOUT_ERROR') {
     return true;
   }
 
-  // Retry network-level errors (common in WebContainer)
+  // Retry network-level errors
   const networkErrors = [
     'fetch failed',
     'ECONNRESET',
@@ -420,16 +455,18 @@ function isRetryableSupabaseError(error) {
   return false;
 }
 
-// WebContainer-friendly connectivity check with DNS diagnostics
+// WebContainer-friendly connectivity check with graceful degradation
 export async function checkSupabaseConnectivity() {
   try {
     const startTime = Date.now();
     const urlObj = new URL(supabaseUrl);
     const hostname = urlObj.hostname;
     
-    logger.info('🔍 Starting WebContainer-optimized connectivity check with DNS diagnostics...', {
+    logger.info('🔍 Starting WebContainer connectivity check with graceful degradation...', {
       hostname,
-      url: supabaseUrl
+      url: supabaseUrl,
+      dnsIssueDetected: dnsRoutingIssueDetected,
+      consecutiveErrors: consecutiveRoutingErrors
     });
     
     const response = await Promise.race([
@@ -446,7 +483,6 @@ export async function checkSupabaseConnectivity() {
         cache: 'no-cache',
         mode: 'cors',
         credentials: 'omit'
-        // Removed family: 4 option as it causes DNS routing issues with fetch API
       }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Connectivity check timeout after 15 seconds')), 15000)
@@ -488,7 +524,7 @@ export async function checkSupabaseConnectivity() {
     const hostname = urlObj.hostname;
     const isLocalhostRouting = error.cause?.socket?.remoteAddress === '127.0.0.1';
     
-    logger.warn('⚠️ Supabase connectivity check failed (WebContainer network issue):', {
+    logger.warn('⚠️ Supabase connectivity check failed (WebContainer networking issue):', {
       error: error.message,
       hostname,
       url: supabaseUrl,
@@ -496,7 +532,8 @@ export async function checkSupabaseConnectivity() {
       isNetworkError: error.message?.includes('fetch failed'),
       isSocketError: error.cause?.code === 'UND_ERR_SOCKET',
       isLocalhostRouting,
-      remoteAddress: error.cause?.socket?.remoteAddress
+      remoteAddress: error.cause?.socket?.remoteAddress,
+      willContinueWithDegradation: true
     });
     
     return {
@@ -504,7 +541,8 @@ export async function checkSupabaseConnectivity() {
       latency: null,
       error: error.message,
       hostname,
-      isLocalhostRouting
+      isLocalhostRouting,
+      degradedMode: true
     };
   }
 }

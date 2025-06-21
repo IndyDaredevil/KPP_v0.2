@@ -55,7 +55,7 @@ class KaspunkOwnershipSyncService {
       const walletTokenCounts = this.calculateWalletTokenCounts(allOwnershipData);
       logger.info(`📊 Found ${walletTokenCounts.size} unique wallet addresses`);
 
-      // Step 4: Upsert owners data (keep upsert for this table as it's aggregated data)
+      // Step 4: Upsert owners data (keep upsert approach for aggregated data)
       await this.upsertOwnersTable(walletTokenCounts);
 
       // Step 5: Update collection statistics
@@ -269,12 +269,26 @@ class KaspunkOwnershipSyncService {
   async truncateAndInsertTokenOwnership(allOwnershipData) {
     logger.info('💾 Truncating and inserting token ownership data for full refresh...');
     
-    // Step 1: Truncate the table (delete all existing records)
-    logger.debug('🗑️ Truncating kaspunk_token_ownership table...');
-    const { error: truncateError } = await retrySupabaseCall(async () => {
+    // Step 1: Check current record count before truncation
+    logger.debug('🔍 Checking current record count before truncation...');
+    const { count: currentCount, error: countError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_token_ownership')
-        .delete()
+        .select('*', { count: 'exact', head: true });
+    }, 3, 2000);
+
+    if (countError) {
+      logger.warn('⚠️ Could not get current record count:', countError.message);
+    } else {
+      logger.info(`📊 Current records in kaspunk_token_ownership: ${currentCount || 0}`);
+    }
+
+    // Step 2: Truncate the table (delete all existing records)
+    logger.debug('🗑️ Truncating kaspunk_token_ownership table...');
+    const { count: deletedCount, error: truncateError } = await retrySupabaseCall(async () => {
+      return await supabaseAdmin
+        .from('kaspunk_token_ownership')
+        .delete({ count: 'exact' })
         .neq('token_id', 0); // This condition ensures we delete all rows (token_id is never 0)
     }, 3, 2000);
 
@@ -282,14 +296,15 @@ class KaspunkOwnershipSyncService {
       logger.error('❌ Error truncating kaspunk_token_ownership table:', truncateError);
       throw new Error(`Failed to truncate ownership data: ${truncateError.message}`);
     }
-    logger.info('✅ kaspunk_token_ownership table truncated successfully');
+    
+    logger.info(`✅ kaspunk_token_ownership table truncated successfully - deleted ${deletedCount || 0} records`);
 
     if (allOwnershipData.length === 0) {
       logger.info('✅ No new ownership records to insert after truncation.');
       return;
     }
 
-    // Step 2: Deduplicate the data before insertion
+    // Step 3: Deduplicate the data before insertion
     // Since the API should provide unique records, this is a safety measure
     const deduplicatedData = new Map();
     for (const record of allOwnershipData) {
@@ -305,7 +320,7 @@ class KaspunkOwnershipSyncService {
 
     let insertedOwnershipCount = 0;
 
-    // Step 3: Insert all new data in batches
+    // Step 4: Insert all new data in batches
     for (let i = 0; i < uniqueOwnershipData.length; i += this.batchSize) {
       const batch = uniqueOwnershipData.slice(i, i + this.batchSize);
       const batchNumber = Math.floor(i / this.batchSize) + 1;
@@ -334,6 +349,23 @@ class KaspunkOwnershipSyncService {
     }
 
     logger.info(`✅ Inserted ${insertedOwnershipCount} ownership records (${allOwnershipData.length - uniqueOwnershipData.length} duplicates removed)`);
+
+    // Step 5: Verify final record count
+    const { count: finalCount, error: finalCountError } = await retrySupabaseCall(async () => {
+      return await supabaseAdmin
+        .from('kaspunk_token_ownership')
+        .select('*', { count: 'exact', head: true });
+    }, 3, 2000);
+
+    if (finalCountError) {
+      logger.warn('⚠️ Could not verify final record count:', finalCountError.message);
+    } else {
+      logger.info(`📊 Final records in kaspunk_token_ownership: ${finalCount || 0}`);
+      
+      if (finalCount !== insertedOwnershipCount) {
+        logger.warn(`⚠️ Record count mismatch: inserted ${insertedOwnershipCount} but table has ${finalCount}`);
+      }
+    }
   }
 
   /**

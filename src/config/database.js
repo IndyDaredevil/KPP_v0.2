@@ -90,9 +90,8 @@ const createWebContainerFetch = (apiKey) => {
         keepalive: false,
         cache: 'no-cache',
         mode: 'cors',
-        credentials: 'omit',
-        // Force IPv4 resolution to avoid localhost routing
-        family: 4
+        credentials: 'omit'
+        // Removed family: 4 option as it causes DNS routing issues with fetch API
       };
 
       const response = await fetch(url, fetchOptions);
@@ -446,8 +445,8 @@ export async function checkSupabaseConnectivity() {
         },
         cache: 'no-cache',
         mode: 'cors',
-        credentials: 'omit',
-        family: 4 // Force IPv4
+        credentials: 'omit'
+        // Removed family: 4 option as it causes DNS routing issues with fetch API
       }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Connectivity check timeout after 15 seconds')), 15000)

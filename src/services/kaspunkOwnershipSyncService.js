@@ -291,12 +291,12 @@ class KaspunkOwnershipSyncService {
 
       logger.debug(`📝 Upserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
 
-      // Use upsert with conflict resolution on token_id and wallet_address
+      // Use upsert with conflict resolution on token_id only
       const { error: upsertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .upsert(batch, {
-            onConflict: 'token_id,wallet_address',
+            onConflict: 'token_id',
             ignoreDuplicates: false
           });
       }, 3, 2000);

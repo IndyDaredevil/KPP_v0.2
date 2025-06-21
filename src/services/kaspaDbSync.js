@@ -1,6 +1,7 @@
 import { supabaseAdmin, retrySupabaseCall, checkSupabaseConnectivity } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 import { kaspaApi } from './kaspaApi.js';
+import { syncKaspunkOwnership } from './kaspunkOwnershipSyncService.js';
 
 // System user ID for automated operations - will be initialized on first use
 let SYSTEM_USER_ID = null;
@@ -1090,175 +1091,38 @@ export async function syncAllTickerListings(ticker) {
   }
 }
 
-// New function to sync Kaspunk owners
+// Updated function to use the new comprehensive ownership sync service
 export async function syncKaspunkOwners() {
   const startTime = Date.now();
-  logger.info('🧑‍🤝‍🧑 Starting Kaspunk owners sync...');
+  logger.info('🧑‍🤝‍🧑 Starting Kaspunk owners sync using comprehensive ownership service...');
 
   try {
-    // Step 1: Fetch owners data from Kaspa API
-    const { holders, totalHolders, totalMinted, totalSupply } = await kaspaApi.fetchKaspunkOwners();
+    // Use the new comprehensive ownership sync service
+    const result = await syncKaspunkOwnership();
     
-    if (!holders || holders.length === 0) {
-      logger.warn('No holders data returned from API');
-      return {
-        action: 'error',
-        error: 'No holders data returned from API',
-        totalHolders: 0,
-        processedHolders: 0,
-        addedHolders: 0,
-        updatedHolders: 0,
-        errors: 1,
-        durationMs: Date.now() - startTime
-      };
-    }
-
-    logger.info(`Fetched ${holders.length} holders from API (API reports ${totalHolders} total holders)`);
-
-    // Step 2: Update collection stats first
-    try {
-      const statsData = {
-        total_supply: totalSupply || 1000,
-        total_minted: totalMinted || 1000,
-        total_holders: totalHolders || holders.length,
-        average_holding: totalHolders ? (totalMinted / totalHolders) : 0,
-        last_synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Check if stats record exists
-      const { data: existingStats } = await retrySupabaseCall(async () => {
-        return await supabaseAdmin
-          .from('kaspunk_collection_stats')
-          .select('id')
-          .limit(1);
-      });
-
-      if (existingStats && existingStats.length > 0) {
-        // Update existing stats
-        await retrySupabaseCall(async () => {
-          return await supabaseAdmin
-            .from('kaspunk_collection_stats')
-            .update(statsData)
-            .eq('id', existingStats[0].id);
-        });
-        logger.info('Updated collection stats');
-      } else {
-        // Insert new stats
-        await retrySupabaseCall(async () => {
-          return await supabaseAdmin
-            .from('kaspunk_collection_stats')
-            .insert(statsData);
-        });
-        logger.info('Inserted new collection stats');
-      }
-    } catch (statsError) {
-      logger.error('Error updating collection stats:', statsError);
-      // Continue with owner sync even if stats update fails
-    }
-
-    // Step 3: Process each holder and upsert to database
-    let addedCount = 0;
-    let updatedCount = 0;
-    let errorCount = 0;
-    const batchSize = 50;
-
-    logger.info(`Processing ${holders.length} holders in batches of ${batchSize}...`);
-
-    for (let i = 0; i < holders.length; i += batchSize) {
-      const batch = holders.slice(i, i + batchSize);
-      
-      // CRITICAL FIX: Deduplicate wallet addresses within each batch
-      const uniqueHoldersMap = new Map();
-      batch.forEach(holder => {
-        const walletAddress = holder.owner;
-        if (!uniqueHoldersMap.has(walletAddress)) {
-          uniqueHoldersMap.set(walletAddress, holder);
-        } else {
-          // If duplicate found, keep the one with higher token count
-          const existing = uniqueHoldersMap.get(walletAddress);
-          if (holder.count > existing.count) {
-            uniqueHoldersMap.set(walletAddress, holder);
-          }
-        }
-      });
-      
-      const deduplicatedBatch = Array.from(uniqueHoldersMap.values());
-      
-      if (deduplicatedBatch.length !== batch.length) {
-        logger.debug(`Deduplicated batch ${Math.floor(i/batchSize) + 1}: ${batch.length} -> ${deduplicatedBatch.length} unique holders`);
-      }
-      
-      // Create holder records for the batch
-      const holderRecords = deduplicatedBatch.map(holder => ({
-        wallet_address: holder.owner,
-        token_count: holder.count,
-        updated_at: new Date().toISOString()
-      }));
-
-      try {
-        // Use upsert with onConflict to handle duplicates properly
-        const { error } = await retrySupabaseCall(async () => {
-          return await supabaseAdmin
-            .from('kaspunk_owners')
-            .upsert(holderRecords, {
-              onConflict: 'wallet_address',
-              returning: false // Don't need to return data for performance
-            });
-        });
-
-        if (error) {
-          logger.error(`Error upserting batch of holders (${i+1}-${i+deduplicatedBatch.length}):`, error);
-          errorCount += deduplicatedBatch.length;
-        } else {
-          // Since we're using upsert without returning data, we can't accurately track added vs updated
-          // So we'll just count them all as processed
-          const processedCount = deduplicatedBatch.length;
-          
-          // For reporting purposes, estimate added vs updated (not accurate but gives a sense)
-          addedCount += Math.floor(processedCount * 0.1); // Assume ~10% are new
-          updatedCount += processedCount - Math.floor(processedCount * 0.1); // The rest are updates
-          
-          logger.debug(`Processed batch of ${deduplicatedBatch.length} holders (${i+1}-${Math.min(i+batchSize, holders.length)}/${holders.length})`);
-        }
-
-        // Add a small delay between batches
-        if (i + batchSize < holders.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      } catch (batchError) {
-        logger.error(`Error processing batch of holders (${i+1}-${i+deduplicatedBatch.length}):`, batchError);
-        errorCount += deduplicatedBatch.length;
-      }
-    }
-
-    // Calculate duration and prepare result
-    const endTime = Date.now();
-    const durationMs = endTime - startTime;
-    const durationSeconds = (durationMs / 1000).toFixed(2);
-
-    const result = {
+    // Transform the result to match the expected format for backward compatibility
+    const transformedResult = {
       action: 'synced',
-      totalHolders: totalHolders || holders.length,
-      processedHolders: holders.length,
-      addedHolders: addedCount,
-      updatedHolders: updatedCount,
-      errors: errorCount,
-      durationMs,
-      durationSeconds: `${durationSeconds}s`,
+      totalHolders: result.unique_owners,
+      processedHolders: result.total_ownership_records,
+      addedHolders: Math.floor(result.unique_owners * 0.1), // Estimate for compatibility
+      updatedHolders: result.unique_owners - Math.floor(result.unique_owners * 0.1),
+      errors: 0,
+      durationMs: result.duration_ms,
+      durationSeconds: `${(result.duration_ms / 1000).toFixed(2)}s`,
       startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString()
+      endTime: result.timestamp
     };
 
-    logger.info(`✅ Kaspunk owners sync completed:`, result);
-    return result;
+    logger.info(`✅ Kaspunk owners sync completed using comprehensive service:`, transformedResult);
+    return transformedResult;
 
   } catch (error) {
-    logger.error('Error syncing Kaspunk owners:', error);
+    logger.error('Error syncing Kaspunk owners using comprehensive service:', error);
     
     return {
       action: 'error',
-      error: error.message,
+      error: error.error || error.message || 'Unknown error occurred',
       totalHolders: 0,
       processedHolders: 0,
       addedHolders: 0,

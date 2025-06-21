@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import listingsRoutes, { getAllSalesHistoryHandler } from './routes/listings.js';
+import syncRoutes from './routes/syncRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { setupSwagger } from './utils/swagger.js';
 import { logger } from './utils/logger.js';
@@ -81,7 +82,8 @@ app.get('/', (req, res) => {
       health: '/api/health',
       auth: '/api/auth',
       listings: '/api/listings',
-      salesHistory: '/api/sales-history'
+      salesHistory: '/api/sales-history',
+      sync: '/api/sync'
     }
   });
 });
@@ -128,6 +130,7 @@ app.get('/api-docs/', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingsRoutes);
+app.use('/api/sync', syncRoutes);
 
 // Add direct route for /api/sales-history to fix the routing issue
 app.get('/api/sales-history', authenticate, validatePagination, getAllSalesHistoryHandler);
@@ -321,6 +324,7 @@ const startServer = async () => {
       logger.info(`✅ Server successfully started on port ${PORT}`);
       logger.info(`🌐 Server accessible at: http://0.0.0.0:${PORT}`);
       logger.info(`📚 API Documentation available at: http://0.0.0.0:${PORT}/api-docs`);
+      logger.info(`🔄 Sync Operations available at: http://0.0.0.0:${PORT}/api/sync`);
       logger.info('🚀 Server startup completed successfully (WebContainer mode)');
       
       // Setup periodic sync after server is running (only if database connection works)

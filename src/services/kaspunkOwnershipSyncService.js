@@ -21,13 +21,16 @@ class KaspunkOwnershipSyncService {
 
   /**
    * Normalize wallet address to ensure consistency
+   * Enhanced with Unicode normalization to prevent duplicate key conflicts
    */
   normalizeWalletAddress(address) {
     if (!address || typeof address !== 'string') {
       return null;
     }
-    // Trim whitespace and convert to lowercase for consistency
-    return address.trim().toLowerCase();
+    // Trim whitespace, convert to lowercase, and apply Unicode Normalization Form C
+    // This ensures consistent representation and prevents subtle character variations
+    // from causing duplicate key conflicts during database operations
+    return address.trim().toLowerCase().normalize('NFC');
   }
 
   /**

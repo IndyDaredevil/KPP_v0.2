@@ -146,19 +146,19 @@ class KaspunkOwnershipSyncService {
    */
   async fetchAllOwnershipData() {
     const allOwnershipData = [];
-    let offset = undefined;
+    let offset = 0; // FIXED: Initialize to 0 instead of undefined for clarity
     let pageCount = 0;
 
     console.log('📡 Fetching token ownership data from Kaspa API (WebContainer optimized)...');
     console.log('📡 API URL:', this.apiUrl);
     logger.info('📡 Fetching token ownership data from Kaspa API (WebContainer optimized)...');
 
-    while (pageCount < this.maxPages) {
+    while (pageCount < this.maxPages && offset !== null) { // FIXED: Added offset !== null check
       pageCount++;
       
       // Construct API URL with pagination
       let apiUrl = this.apiUrl;
-      if (offset !== undefined) {
+      if (offset !== undefined && offset !== null) {
         apiUrl += `?offset=${offset}`;
       }
 
@@ -251,8 +251,9 @@ class KaspunkOwnershipSyncService {
             console.log(`🔄 Next page available with calculated offset: ${offset}`);
             logger.debug(`🔄 Next page available with calculated offset: ${offset}`);
           } else {
-            console.log('✅ No more pages available');
-            logger.info('✅ No more pages available');
+            console.log('✅ No more pages available - setting offset to null to terminate loop');
+            logger.info('✅ No more pages available - setting offset to null to terminate loop');
+            offset = null; // FIXED: Set offset to null to break the main while loop
             success = true;
             break;
           }
@@ -304,8 +305,9 @@ class KaspunkOwnershipSyncService {
         throw new Error(`Failed to fetch ownership data from Kaspa API after ${this.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
       }
 
-      // If we've reached the end, break
-      if (offset === undefined || offset === null) {
+      // If we've reached the end (offset is null), break
+      if (offset === null) {
+        console.log('🏁 Pagination complete - offset is null, exiting loop');
         break;
       }
 

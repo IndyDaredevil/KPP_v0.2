@@ -38,11 +38,11 @@ logger.info('Supabase environment variables validated successfully', {
   serviceKeyPrefix: `${supabaseServiceRoleKey.substring(0, 20)}...`
 });
 
-// WebContainer-optimized fetch wrapper with enhanced logging
+// WebContainer-optimized fetch wrapper with enhanced logging and network fixes
 const createWebContainerFetch = (apiKey) => {
   return async (url, options = {}) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced timeout for WebContainer
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // Increased timeout for WebContainer
     
     try {
       const headers = {
@@ -50,6 +50,9 @@ const createWebContainerFetch = (apiKey) => {
         'apikey': apiKey,
         'Authorization': `Bearer ${apiKey}`,
         'User-Agent': 'nft-listings-webcontainer/1.0.0',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
         ...options.headers
       };
       
@@ -60,29 +63,38 @@ const createWebContainerFetch = (apiKey) => {
         hasHeaders: !!headers,
         hasBody: !!options.body,
         bodyLength: options.body ? JSON.stringify(options.body).length : 0,
-        timeout: 15000
+        timeout: 25000,
+        userAgent: headers['User-Agent']
       });
       
-      const response = await fetch(url, {
+      // WebContainer-specific fetch configuration
+      const fetchOptions = {
         ...options,
         signal: controller.signal,
         headers,
         // WebContainer-specific optimizations
         keepalive: false,
-        cache: 'no-cache'
-      });
+        cache: 'no-cache',
+        mode: 'cors',
+        credentials: 'omit',
+        // Force IPv4 resolution to avoid IPv6 issues in WebContainer
+        family: 4
+      };
+
+      const response = await fetch(url, fetchOptions);
       
       // Log successful response
       logger.networkDebug('Supabase fetch response', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
-        url: url.substring(0, 100) + (url.length > 100 ? '...' : '')
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        headers: Object.fromEntries(response.headers.entries())
       });
       
       return response;
     } catch (error) {
-      // Enhanced error logging
+      // Enhanced error logging with WebContainer-specific details
       logger.error('🌐 [NETWORK] Supabase fetch failed', {
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
         method: options.method || 'GET',
@@ -90,8 +102,28 @@ const createWebContainerFetch = (apiKey) => {
         errorMessage: error.message,
         errorCode: error.code,
         errorCause: error.cause,
-        stack: error.stack?.substring(0, 500)
+        stack: error.stack?.substring(0, 500),
+        // WebContainer-specific debugging
+        isAbortError: error.name === 'AbortError',
+        isNetworkError: error.message?.includes('fetch failed'),
+        isSocketError: error.cause?.code === 'UND_ERR_SOCKET'
       });
+      
+      // Transform WebContainer-specific errors into more actionable messages
+      if (error.cause?.code === 'UND_ERR_SOCKET') {
+        const newError = new Error(`WebContainer network error: Unable to establish connection to Supabase. This may be a temporary network issue.`);
+        newError.code = 'WEBCONTAINER_NETWORK_ERROR';
+        newError.originalError = error;
+        throw newError;
+      }
+      
+      if (error.name === 'AbortError') {
+        const newError = new Error('Request timeout: Supabase connection took too long to respond');
+        newError.code = 'TIMEOUT_ERROR';
+        newError.originalError = error;
+        throw newError;
+      }
+      
       throw error;
     } finally {
       clearTimeout(timeoutId);
@@ -99,7 +131,7 @@ const createWebContainerFetch = (apiKey) => {
   };
 };
 
-// WebContainer-optimized client configuration
+// WebContainer-optimized client configuration with network resilience
 const clientConfig = {
   auth: {
     autoRefreshToken: false,
@@ -108,13 +140,25 @@ const clientConfig = {
   global: {
     headers: {
       'User-Agent': 'nft-listings-webcontainer/1.0.0',
-      'X-Client-Info': 'webcontainer-mode'
+      'X-Client-Info': 'webcontainer-mode',
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache'
     },
     fetch: createWebContainerFetch(supabaseKey)
+  },
+  // WebContainer-specific database configuration
+  db: {
+    schema: 'public'
+  },
+  // Disable realtime for better stability in WebContainer
+  realtime: {
+    params: {
+      eventsPerSecond: 2
+    }
   }
 };
 
-// Admin client configuration
+// Admin client configuration with enhanced error handling
 const adminClientConfig = {
   auth: {
     autoRefreshToken: false,
@@ -123,32 +167,44 @@ const adminClientConfig = {
   global: {
     headers: {
       'User-Agent': 'nft-listings-webcontainer/1.0.0',
-      'X-Client-Info': 'webcontainer-mode'
+      'X-Client-Info': 'webcontainer-admin-mode',
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache'
     },
     fetch: createWebContainerFetch(supabaseServiceRoleKey)
+  },
+  db: {
+    schema: 'public'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2
+    }
   }
 };
 
 export const supabase = createClient(supabaseUrl, supabaseKey, clientConfig);
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, adminClientConfig);
 
-// WebContainer-friendly test connection function
+// WebContainer-friendly test connection function with enhanced error handling
 export async function testConnection() {
   try {
-    logger.info('Testing database connection (WebContainer mode)...');
+    logger.info('Testing database connection (WebContainer mode with network resilience)...');
     
     // Use a simpler test that's more likely to work in WebContainer
     const { data, error } = await Promise.race([
       supabase.from('users').select('count', { count: 'exact', head: true }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+        setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
       )
     ]);
 
     if (error) {
       logger.warn('Database connection test failed (non-critical in WebContainer):', {
         message: error.message,
-        code: error.code
+        code: error.code,
+        isNetworkError: error.message?.includes('fetch failed'),
+        isSocketError: error.message?.includes('UND_ERR_SOCKET')
       });
       // In WebContainer, we'll allow the server to start even if the initial connection fails
       return false;
@@ -159,15 +215,18 @@ export async function testConnection() {
   } catch (error) {
     logger.warn('Database connection test failed (non-critical in WebContainer):', {
       message: error.message,
-      name: error.name
+      name: error.name,
+      code: error.code,
+      isTimeout: error.message?.includes('timeout'),
+      isNetworkError: error.message?.includes('network')
     });
     // In WebContainer, we'll allow the server to start even if the initial connection fails
     return false;
   }
 }
 
-// Simplified retry function for WebContainer with improved resilience and enhanced logging
-export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1500) {
+// Enhanced retry function for WebContainer with improved resilience and network-specific handling
+export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2000) {
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -199,7 +258,7 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
     } catch (error) {
       lastError = error;
       
-      // Enhanced error logging
+      // Enhanced error logging with WebContainer-specific context
       logger.error(`❌ [SUPABASE] Attempt ${attempt}/${maxRetries} failed`, {
         errorName: error.name,
         errorMessage: error.message,
@@ -207,7 +266,9 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
         errorDetails: error.details,
         errorHint: error.hint,
         errorStack: error.stack?.substring(0, 300),
-        supabaseError: error.supabaseError
+        supabaseError: error.supabaseError,
+        isWebContainerNetworkError: error.code === 'WEBCONTAINER_NETWORK_ERROR',
+        isTimeoutError: error.code === 'TIMEOUT_ERROR'
       });
       
       // Check if it's a retryable error
@@ -224,8 +285,8 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
         throw error;
       }
       
-      // Longer delays for better stability
-      const delay = Math.min(baseDelay * attempt, 4500);
+      // Longer delays for WebContainer network issues
+      const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 8000);
       
       logger.warn(`🔄 [SUPABASE] Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`, {
         error: error.message,
@@ -233,7 +294,8 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
         attempt,
         maxRetries,
         delay,
-        shouldRetry
+        shouldRetry,
+        isNetworkIssue: error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR'
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -243,7 +305,7 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
   throw lastError;
 }
 
-// Enhanced error detection for WebContainer
+// Enhanced error detection for WebContainer with network-specific handling
 function isRetryableSupabaseError(error) {
   // Don't retry authentication/authorization errors
   if (error.message && (
@@ -265,6 +327,11 @@ function isRetryableSupabaseError(error) {
     return false;
   }
 
+  // Always retry WebContainer-specific network errors
+  if (error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR') {
+    return true;
+  }
+
   // Retry network-level errors (common in WebContainer)
   const networkErrors = [
     'fetch failed',
@@ -275,7 +342,8 @@ function isRetryableSupabaseError(error) {
     'socket hang up',
     'network error',
     'connection error',
-    'Connection timeout'
+    'Connection timeout',
+    'UND_ERR_SOCKET'
   ];
   
   if (error.message) {
@@ -299,22 +367,29 @@ function isRetryableSupabaseError(error) {
   return false;
 }
 
-// WebContainer-friendly connectivity check
+// WebContainer-friendly connectivity check with enhanced error handling
 export async function checkSupabaseConnectivity() {
   try {
     const startTime = Date.now();
+    
+    logger.info('🔍 Starting WebContainer-optimized connectivity check...');
+    
     const response = await Promise.race([
       fetch(`${supabaseUrl}/rest/v1/`, {
         method: 'HEAD',
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`,
-          'User-Agent': 'nft-listings-webcontainer/1.0.0'
+          'User-Agent': 'nft-listings-webcontainer/1.0.0',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
         },
-        cache: 'no-cache'
+        cache: 'no-cache',
+        mode: 'cors',
+        credentials: 'omit'
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connectivity check timeout')), 8000)
+        setTimeout(() => reject(new Error('Connectivity check timeout after 10 seconds')), 10000)
       )
     ]);
     
@@ -324,18 +399,20 @@ export async function checkSupabaseConnectivity() {
     const result = {
       connected: response.ok,
       latency,
-      status: response.status
+      status: response.status,
+      statusText: response.statusText
     };
     
     if (response.ok) {
-      logger.info('Supabase connectivity check successful', {
+      logger.info('✅ Supabase connectivity check successful', {
         status: response.status,
         latency: `${latency}ms`,
         url: supabaseUrl
       });
     } else {
-      logger.warn('Supabase connectivity check failed', {
+      logger.warn('⚠️ Supabase connectivity check failed', {
         status: response.status,
+        statusText: response.statusText,
         latency: `${latency}ms`,
         url: supabaseUrl
       });
@@ -344,9 +421,11 @@ export async function checkSupabaseConnectivity() {
     return result;
     
   } catch (error) {
-    logger.warn('Supabase connectivity check failed (WebContainer limitation):', {
+    logger.warn('⚠️ Supabase connectivity check failed (WebContainer limitation):', {
       error: error.message,
-      url: supabaseUrl
+      url: supabaseUrl,
+      isTimeout: error.message?.includes('timeout'),
+      isNetworkError: error.message?.includes('fetch failed')
     });
     
     return {

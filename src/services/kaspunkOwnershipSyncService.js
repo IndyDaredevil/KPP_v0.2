@@ -5,17 +5,19 @@ import { logger } from '../utils/logger.js';
 /**
  * Comprehensive Kaspunk ownership sync service
  * Migrated from Deno edge function to Node.js for better efficiency and stability
+ * Enhanced for WebContainer network resilience
  */
 
 class KaspunkOwnershipSyncService {
   constructor() {
     this.apiUrl = 'https://mainnet.krc721.stream/api/v1/krc721/mainnet/owners/KASPUNKS';
     this.maxPages = 100; // Safety limit to prevent infinite loops
-    this.batchSize = 100; // Batch size for database operations
-    this.ownerBatchSize = 100; // Batch size for owner records
-    this.requestTimeout = 30000; // 30 second timeout
-    this.requestDelay = 200; // Delay between API requests
-    this.batchDelay = 50; // Delay between database batches
+    this.batchSize = 50; // Reduced batch size for WebContainer stability
+    this.ownerBatchSize = 50; // Reduced batch size for owner records
+    this.requestTimeout = 45000; // Increased timeout for WebContainer
+    this.requestDelay = 500; // Increased delay between API requests
+    this.batchDelay = 200; // Increased delay between database batches
+    this.maxRetries = 5; // Increased retries for WebContainer
   }
 
   /**
@@ -25,7 +27,7 @@ class KaspunkOwnershipSyncService {
     const startTime = Date.now();
     
     try {
-      logger.info('🔍 Starting KasPunk token ownership sync...');
+      logger.info('🔍 Starting KasPunk token ownership sync (WebContainer optimized)...');
 
       // Step 1: Fetch all ownership data from Kaspa API
       const allOwnershipData = await this.fetchAllOwnershipData();
@@ -88,14 +90,14 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Fetch all ownership data from Kaspa API with pagination
+   * Fetch all ownership data from Kaspa API with pagination and WebContainer optimizations
    */
   async fetchAllOwnershipData() {
     const allOwnershipData = [];
     let offset = undefined;
     let pageCount = 0;
 
-    logger.info('📡 Fetching token ownership data from Kaspa API...');
+    logger.info('📡 Fetching token ownership data from Kaspa API (WebContainer optimized)...');
 
     while (pageCount < this.maxPages) {
       pageCount++;
@@ -114,87 +116,135 @@ class KaspunkOwnershipSyncService {
         page: pageCount,
         offset: offset,
         timeout: this.requestTimeout,
-        maxPages: this.maxPages
+        maxPages: this.maxPages,
+        maxRetries: this.maxRetries
       });
 
-      try {
-        // Fetch data from Kaspa API with timeout
-        const response = await axios.get(apiUrl, {
-          timeout: this.requestTimeout,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'KasPunkPredictor/1.0'
+      let lastError;
+      let success = false;
+
+      // Retry logic for API calls in WebContainer
+      for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+        try {
+          logger.debug(`🔄 [KASPA API] Attempt ${attempt}/${this.maxRetries} for page ${pageCount}`);
+
+          // Fetch data from Kaspa API with timeout and WebContainer optimizations
+          const response = await axios.get(apiUrl, {
+            timeout: this.requestTimeout,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'User-Agent': 'KasPunkPredictor/1.0',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive'
+            },
+            // WebContainer-specific axios configuration
+            maxRedirects: 3,
+            validateStatus: (status) => status >= 200 && status < 300,
+            // Force IPv4 to avoid IPv6 issues in WebContainer
+            family: 4
+          });
+
+          logger.apiDebug('kaspa', 'ownership-fetch-response', {
+            status: response.status,
+            statusText: response.statusText,
+            dataLength: response.data ? JSON.stringify(response.data).length : 0,
+            hasResult: !!(response.data && response.data.result),
+            hasOwners: !!(response.data && response.data.owners),
+            isArray: Array.isArray(response.data),
+            attempt: attempt,
+            page: pageCount
+          });
+
+          const data = response.data;
+          logger.debug(`📄 Raw response preview: ${JSON.stringify(data).substring(0, 200)}...`);
+
+          // Handle different response formats
+          let ownershipRecords = [];
+          if (data.result && Array.isArray(data.result)) {
+            ownershipRecords = data.result;
+          } else if (Array.isArray(data)) {
+            ownershipRecords = data;
+          } else if (data.owners && Array.isArray(data.owners)) {
+            ownershipRecords = data.owners;
+          } else {
+            logger.error(`❌ Unexpected response format:`, data);
+            throw new Error('Invalid response format from Kaspa API - no recognizable data structure');
           }
-        });
 
-        logger.apiDebug('kaspa', 'ownership-fetch-response', {
-          status: response.status,
-          statusText: response.statusText,
-          dataLength: response.data ? JSON.stringify(response.data).length : 0,
-          hasResult: !!(response.data && response.data.result),
-          hasOwners: !!(response.data && response.data.owners),
-          isArray: Array.isArray(response.data)
-        });
+          logger.info(`✅ Page ${pageCount}: Received ${ownershipRecords.length} ownership records (attempt ${attempt})`);
 
-        const data = response.data;
-        logger.debug(`📄 Raw response preview: ${JSON.stringify(data).substring(0, 200)}...`);
+          // Process the ownership data
+          for (const item of ownershipRecords) {
+            const processedItem = this.processOwnershipRecord(item);
+            if (processedItem) {
+              allOwnershipData.push(processedItem);
+            }
+          }
 
-        // Handle different response formats
-        let ownershipRecords = [];
-        if (data.result && Array.isArray(data.result)) {
-          ownershipRecords = data.result;
-        } else if (Array.isArray(data)) {
-          ownershipRecords = data;
-        } else if (data.owners && Array.isArray(data.owners)) {
-          ownershipRecords = data.owners;
-        } else {
-          logger.error(`❌ Unexpected response format:`, data);
-          throw new Error('Invalid response format from Kaspa API - no recognizable data structure');
-        }
+          // Check if there's a next page
+          if (data.next !== undefined && data.next !== null) {
+            offset = data.next;
+            logger.debug(`🔄 Next page available with offset: ${offset}`);
+          } else if (data.hasMore === true) {
+            offset = (offset || 0) + ownershipRecords.length;
+            logger.debug(`🔄 Next page available with calculated offset: ${offset}`);
+          } else {
+            logger.info('✅ No more pages available');
+            success = true;
+            break;
+          }
 
-        logger.info(`✅ Page ${pageCount}: Received ${ownershipRecords.length} ownership records`);
+          success = true;
+          break; // Success, exit retry loop
 
-        // Process the ownership data
-        for (const item of ownershipRecords) {
-          const processedItem = this.processOwnershipRecord(item);
-          if (processedItem) {
-            allOwnershipData.push(processedItem);
+        } catch (error) {
+          lastError = error;
+          
+          // Enhanced error logging for API calls
+          logger.error(`❌ Error fetching page ${pageCount} (attempt ${attempt}/${this.maxRetries}):`, {
+            errorName: error.name,
+            errorMessage: error.message,
+            errorCode: error.code,
+            errorResponse: error.response ? {
+              status: error.response.status,
+              statusText: error.response.statusText,
+              data: error.response.data
+            } : null,
+            url: apiUrl,
+            page: pageCount,
+            attempt: attempt,
+            timeout: this.requestTimeout,
+            isNetworkError: error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT',
+            isTimeoutError: error.code === 'ECONNABORTED' || error.message?.includes('timeout')
+          });
+
+          // Don't retry on certain errors
+          if (error.response?.status === 404 || error.response?.status === 401 || error.response?.status === 403) {
+            logger.error(`❌ Non-retryable error for page ${pageCount}: ${error.response.status}`);
+            break;
+          }
+
+          // Wait before retrying (exponential backoff)
+          if (attempt < this.maxRetries) {
+            const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+            logger.warn(`🔄 Retrying page ${pageCount} in ${retryDelay}ms (attempt ${attempt + 1}/${this.maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
           }
         }
-
-        // Check if there's a next page
-        if (data.next !== undefined && data.next !== null) {
-          offset = data.next;
-          logger.debug(`🔄 Next page available with offset: ${offset}`);
-        } else if (data.hasMore === true) {
-          offset = (offset || 0) + ownershipRecords.length;
-          logger.debug(`🔄 Next page available with calculated offset: ${offset}`);
-        } else {
-          logger.info('✅ No more pages available');
-          break;
-        }
-
-        // Small delay between requests to be API-friendly
-        await new Promise(resolve => setTimeout(resolve, this.requestDelay));
-
-      } catch (error) {
-        // Enhanced error logging for API calls
-        logger.error(`❌ Error fetching page ${pageCount}:`, {
-          errorName: error.name,
-          errorMessage: error.message,
-          errorCode: error.code,
-          errorResponse: error.response ? {
-            status: error.response.status,
-            statusText: error.response.statusText,
-            data: error.response.data
-          } : null,
-          url: apiUrl,
-          page: pageCount,
-          timeout: this.requestTimeout
-        });
-        throw new Error(`Failed to fetch ownership data from Kaspa API: ${error.message}`);
       }
+
+      if (!success) {
+        throw new Error(`Failed to fetch ownership data from Kaspa API after ${this.maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+      }
+
+      // If we've reached the end, break
+      if (offset === undefined || offset === null) {
+        break;
+      }
+
+      // Longer delay between requests for WebContainer stability
+      await new Promise(resolve => setTimeout(resolve, this.requestDelay));
     }
 
     if (pageCount >= this.maxPages) {
@@ -236,20 +286,21 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Clear and repopulate kaspunk_token_ownership table
+   * Clear and repopulate kaspunk_token_ownership table with WebContainer optimizations
    */
   async updateTokenOwnershipTable(allOwnershipData) {
-    logger.info('🗑️ Clearing existing token ownership data...');
+    logger.info('🗑️ Clearing existing token ownership data (WebContainer optimized)...');
     
     // Enhanced logging before database operation
     logger.debug('🗄️ [DATABASE] Starting token ownership table clear operation');
     
+    // Use enhanced retry with longer delays for WebContainer
     const { error: deleteOwnershipError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_token_ownership')
         .delete()
         .neq('token_id', 0); // Delete all records
-    });
+    }, 5, 3000); // 5 retries with 3 second base delay
 
     if (deleteOwnershipError) {
       logger.warn('⚠️ Warning: Failed to clear existing ownership data:', deleteOwnershipError);
@@ -257,8 +308,8 @@ class KaspunkOwnershipSyncService {
       logger.debug('✅ [DATABASE] Token ownership table cleared successfully');
     }
 
-    // Insert new ownership data in batches
-    logger.info('💾 Inserting new token ownership data...');
+    // Insert new ownership data in smaller batches for WebContainer stability
+    logger.info('💾 Inserting new token ownership data (WebContainer optimized)...');
     let insertedOwnershipCount = 0;
 
     for (let i = 0; i < allOwnershipData.length; i += this.batchSize) {
@@ -276,11 +327,12 @@ class KaspunkOwnershipSyncService {
         totalRecords: allOwnershipData.length
       });
 
+      // Use enhanced retry with longer delays for WebContainer
       const { error: insertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .insert(batch);
-      });
+      }, 5, 3000); // 5 retries with 3 second base delay
 
       if (insertError) {
         logger.error(`❌ Error inserting ownership batch ${batchNumber}:`, insertError);
@@ -290,7 +342,7 @@ class KaspunkOwnershipSyncService {
       insertedOwnershipCount += batch.length;
       logger.debug(`✅ [DATABASE] Ownership batch ${batchNumber} inserted successfully`);
 
-      // Small delay between batches
+      // Longer delay between batches for WebContainer stability
       await new Promise(resolve => setTimeout(resolve, this.batchDelay));
     }
 
@@ -315,20 +367,21 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Clear and repopulate kaspunk_owners table
+   * Clear and repopulate kaspunk_owners table with WebContainer optimizations
    */
   async updateOwnersTable(walletTokenCounts) {
-    logger.info('🗑️ Clearing existing kaspunk_owners data...');
+    logger.info('🗑️ Clearing existing kaspunk_owners data (WebContainer optimized)...');
     
     // Enhanced logging before database operation
     logger.debug('🗄️ [DATABASE] Starting kaspunk_owners table clear operation');
     
+    // Use enhanced retry with longer delays for WebContainer
     const { error: deleteOwnersError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_owners')
         .delete()
         .neq('wallet_address', ''); // Delete all records
-    });
+    }, 5, 3000); // 5 retries with 3 second base delay
 
     if (deleteOwnersError) {
       logger.warn('⚠️ Warning: Failed to clear existing owners data:', deleteOwnersError);
@@ -336,8 +389,8 @@ class KaspunkOwnershipSyncService {
       logger.debug('✅ [DATABASE] Kaspunk_owners table cleared successfully');
     }
 
-    // Insert new owners data in batches
-    logger.info('💾 Inserting new kaspunk_owners data...');
+    // Insert new owners data in smaller batches for WebContainer stability
+    logger.info('💾 Inserting new kaspunk_owners data (WebContainer optimized)...');
     
     const ownerRecords = Array.from(walletTokenCounts.entries()).map(([wallet_address, token_count]) => ({
       wallet_address,
@@ -363,11 +416,12 @@ class KaspunkOwnershipSyncService {
         totalOwners: ownerRecords.length
       });
 
+      // Use enhanced retry with longer delays for WebContainer
       const { error: insertOwnersError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_owners')
           .insert(batch);
-      });
+      }, 5, 3000); // 5 retries with 3 second base delay
 
       if (insertOwnersError) {
         logger.error(`❌ Error inserting owners batch ${batchNumber}:`, insertOwnersError);
@@ -377,7 +431,7 @@ class KaspunkOwnershipSyncService {
       insertedOwnersCount += batch.length;
       logger.debug(`✅ [DATABASE] Owners batch ${batchNumber} inserted successfully`);
 
-      // Small delay between batches
+      // Longer delay between batches for WebContainer stability
       await new Promise(resolve => setTimeout(resolve, this.batchDelay));
     }
 
@@ -385,10 +439,10 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Update collection statistics
+   * Update collection statistics with WebContainer optimizations
    */
   async updateCollectionStats(allOwnershipData, walletTokenCounts) {
-    logger.info('📊 Updating collection statistics...');
+    logger.info('📊 Updating collection statistics (WebContainer optimized)...');
     
     const totalSupply = 1000; // Known KasPunk total supply
     const totalMinted = Math.max(...allOwnershipData.map(item => item.token_id)); // Highest token ID
@@ -412,7 +466,7 @@ class KaspunkOwnershipSyncService {
       averageHolding: averageHolding.toFixed(2)
     });
 
-    // Upsert collection statistics
+    // Use enhanced retry with longer delays for WebContainer
     const { error: statsError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_collection_stats')
@@ -420,7 +474,7 @@ class KaspunkOwnershipSyncService {
           onConflict: 'id',
           ignoreDuplicates: false
         });
-    });
+    }, 5, 3000); // 5 retries with 3 second base delay
 
     if (statsError) {
       logger.error('❌ Error updating collection statistics:', statsError);

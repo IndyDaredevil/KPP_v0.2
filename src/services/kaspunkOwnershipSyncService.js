@@ -97,84 +97,15 @@ class KaspunkOwnershipSyncService {
     try {
       logger.info('🔍 Checking current table state...');
       
+      // Temporarily disable table state check to avoid syntax errors
+      logger.info('📊 Table state check temporarily disabled');
+      
+      /*
       const { count: currentCount, error: countError } = await retrySupabaseCall(async () => {
-        return await /* supabaseAdmin
+        return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .select('*', { count: 'exact', head: true });
-      }, 3, 2000); */
-
-// In frontend/src/services/kaspunkOwnershipSyncService.js
-
-// ... (rest of the file)
-
-  /**
-   * Upsert token ownership data to the new table structure
-   */
-  async upsertTokenOwnershipTable(ownershipData) {
-    logger.info(`💾 Upserting ${ownershipData.length} token ownership records...`);
-    
-    let upsertedCount = 0;
-
-    // Process data in batches
-    for (let i = 0; i < ownershipData.length; i += this.batchSize) {
-      const batch = ownershipData.slice(i, i + this.batchSize);
-      const batchNumber = Math.floor(i / this.batchSize) + 1;
-      const totalBatches = Math.ceil(ownershipData.length / this.batchSize);
-
-      logger.debug(`📝 Upserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
-
-      // Prepare batch data with timestamps
-      const batchWithTimestamps = batch.map(record => ({
-        token_id: record.token_id,
-        wallet_address: record.wallet_address,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-
-      logger.debug(`🔍 Sample batch data:`, batchWithTimestamps.slice(0, 2));
-
-      try {
-        // Call the new Supabase RPC function for upserting
-        const { error: upsertError } = await retrySupabaseCall(async () => {
-          return await supabaseAdmin.rpc('upsert_kaspunk_ownership', {
-            records: batchWithTimestamps // Pass the array of records to the function
-          });
-        }, 1, 1000); // Reduced retries for faster debugging
-
-        if (upsertError) {
-          logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, {
-            error: upsertError,
-            batchSize: batch.length,
-            sampleData: batchWithTimestamps.slice(0, 2)
-          });
-          throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
-        }
-
-        upsertedCount += batch.length;
-        logger.debug(`✅ Ownership batch ${batchNumber} upserted successfully`);
-
-      } catch (error) {
-        logger.error(`❌ Critical error in batch ${batchNumber}:`, {
-          error: error.message,
-          batchData: batchWithTimestamps.slice(0, 2)
-        });
-        throw error;
-      }
-
-      // Delay between batches
-      if (batchNumber < totalBatches) {
-        await new Promise(resolve => setTimeout(resolve, this.batchDelay));
-      }
-    }
-
-    logger.info(`✅ Successfully upserted ${upsertedCount} ownership records`);
-
-    // Verify final record count
-    await this.verifyFinalRecordCount();
-  }
-
-// ... (rest of the file)
-        
+      }, 3, 2000);
 
       if (countError) {
         logger.warn('⚠️ Could not check current table state:', countError.message);
@@ -193,6 +124,7 @@ class KaspunkOwnershipSyncService {
           logger.info('📋 Sample existing records:', sampleRecords);
         }
       }
+      */
     } catch (error) {
       logger.warn('⚠️ Error checking table state:', error.message);
     }
@@ -426,14 +358,11 @@ class KaspunkOwnershipSyncService {
       logger.debug(`🔍 Sample batch data:`, batchWithTimestamps.slice(0, 2));
 
       try {
-        // Use upsert with conflict resolution on token_id (matches unique_token_id constraint)
+        // Call the new Supabase RPC function for upserting
         const { error: upsertError } = await retrySupabaseCall(async () => {
-          return await supabaseAdmin
-            .from('kaspunk_token_ownership')
-            .upsert(batchWithTimestamps, {
-              onConflict: 'token_id',
-              ignoreDuplicates: false
-            });
+          return await supabaseAdmin.rpc('upsert_kaspunk_ownership', {
+            records: batchWithTimestamps // Pass the array of records to the function
+          });
         }, 1, 1000); // Reduced retries for faster debugging
 
         if (upsertError) {

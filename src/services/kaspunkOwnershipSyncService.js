@@ -21,16 +21,13 @@ class KaspunkOwnershipSyncService {
 
   /**
    * Normalize wallet address to ensure consistency
-   * Enhanced with Unicode normalization to prevent duplicate key conflicts
    */
   normalizeWalletAddress(address) {
     if (!address || typeof address !== 'string') {
       return null;
     }
-    // Trim whitespace, convert to lowercase, and apply Unicode Normalization Form C
-    // This ensures consistent representation and prevents subtle character variations
-    // from causing duplicate key conflicts during database operations
-    return address.trim().toLowerCase().normalize('NFC');
+    // Trim whitespace and convert to lowercase for consistency
+    return address.trim().toLowerCase();
   }
 
   /**
@@ -352,17 +349,21 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Upsert owners data
+   * Upsert owners data - FIXED to handle aggregated wallet data properly
    */
   async upsertOwnersTable(walletTokenCounts) {
     logger.info('💾 Upserting kaspunk_owners data...');
     
+    // Convert the Map to an array of owner records
+    // Each record represents one wallet with its total token count
     const ownerRecords = Array.from(walletTokenCounts.entries()).map(([wallet_address, token_count]) => ({
       wallet_address,
       token_count,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }));
+
+    logger.info(`📊 Preparing to upsert ${ownerRecords.length} unique wallet records`);
 
     let upsertedOwnersCount = 0;
 
@@ -373,6 +374,8 @@ class KaspunkOwnershipSyncService {
 
       logger.debug(`📝 Upserting owners batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
 
+      // Use upsert with conflict resolution on wallet_address (primary key)
+      // This will update existing records or insert new ones
       const { error: upsertOwnersError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_owners')
@@ -397,6 +400,19 @@ class KaspunkOwnershipSyncService {
     }
 
     logger.info(`✅ Upserted ${upsertedOwnersCount} owner records`);
+
+    // Verify final record count
+    const { count: finalOwnerCount, error: finalOwnerCountError } = await retrySupabaseCall(async () => {
+      return await supabaseAdmin
+        .from('kaspunk_owners')
+        .select('*', { count: 'exact', head: true });
+    }, 3, 2000);
+
+    if (finalOwnerCountError) {
+      logger.warn('⚠️ Could not verify final owner count:', finalOwnerCountError.message);
+    } else {
+      logger.info(`📊 Final records in kaspunk_owners: ${finalOwnerCount || 0}`);
+    }
   }
 
   /**

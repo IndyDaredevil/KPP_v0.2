@@ -107,6 +107,15 @@ class KaspunkOwnershipSyncService {
       }
 
       logger.debug(`📄 Fetching page ${pageCount}${offset ? ` (offset: ${offset})` : ''}...`);
+      
+      // Enhanced logging before API call
+      logger.apiDebug('kaspa', 'ownership-fetch-request', {
+        url: apiUrl,
+        page: pageCount,
+        offset: offset,
+        timeout: this.requestTimeout,
+        maxPages: this.maxPages
+      });
 
       try {
         // Fetch data from Kaspa API with timeout
@@ -119,7 +128,14 @@ class KaspunkOwnershipSyncService {
           }
         });
 
-        logger.debug(`📡 Response status: ${response.status} ${response.statusText}`);
+        logger.apiDebug('kaspa', 'ownership-fetch-response', {
+          status: response.status,
+          statusText: response.statusText,
+          dataLength: response.data ? JSON.stringify(response.data).length : 0,
+          hasResult: !!(response.data && response.data.result),
+          hasOwners: !!(response.data && response.data.owners),
+          isArray: Array.isArray(response.data)
+        });
 
         const data = response.data;
         logger.debug(`📄 Raw response preview: ${JSON.stringify(data).substring(0, 200)}...`);
@@ -163,7 +179,20 @@ class KaspunkOwnershipSyncService {
         await new Promise(resolve => setTimeout(resolve, this.requestDelay));
 
       } catch (error) {
-        logger.error(`❌ Error fetching page ${pageCount}:`, error);
+        // Enhanced error logging for API calls
+        logger.error(`❌ Error fetching page ${pageCount}:`, {
+          errorName: error.name,
+          errorMessage: error.message,
+          errorCode: error.code,
+          errorResponse: error.response ? {
+            status: error.response.status,
+            statusText: error.response.statusText,
+            data: error.response.data
+          } : null,
+          url: apiUrl,
+          page: pageCount,
+          timeout: this.requestTimeout
+        });
         throw new Error(`Failed to fetch ownership data from Kaspa API: ${error.message}`);
       }
     }
@@ -212,6 +241,9 @@ class KaspunkOwnershipSyncService {
   async updateTokenOwnershipTable(allOwnershipData) {
     logger.info('🗑️ Clearing existing token ownership data...');
     
+    // Enhanced logging before database operation
+    logger.debug('🗄️ [DATABASE] Starting token ownership table clear operation');
+    
     const { error: deleteOwnershipError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_token_ownership')
@@ -221,6 +253,8 @@ class KaspunkOwnershipSyncService {
 
     if (deleteOwnershipError) {
       logger.warn('⚠️ Warning: Failed to clear existing ownership data:', deleteOwnershipError);
+    } else {
+      logger.debug('✅ [DATABASE] Token ownership table cleared successfully');
     }
 
     // Insert new ownership data in batches
@@ -233,6 +267,14 @@ class KaspunkOwnershipSyncService {
       const totalBatches = Math.ceil(allOwnershipData.length / this.batchSize);
 
       logger.debug(`📝 Inserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
+      
+      // Enhanced logging before database batch operation
+      logger.debug('🗄️ [DATABASE] Starting ownership batch insert', {
+        batchNumber,
+        totalBatches,
+        batchSize: batch.length,
+        totalRecords: allOwnershipData.length
+      });
 
       const { error: insertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
@@ -246,6 +288,7 @@ class KaspunkOwnershipSyncService {
       }
 
       insertedOwnershipCount += batch.length;
+      logger.debug(`✅ [DATABASE] Ownership batch ${batchNumber} inserted successfully`);
 
       // Small delay between batches
       await new Promise(resolve => setTimeout(resolve, this.batchDelay));
@@ -267,6 +310,7 @@ class KaspunkOwnershipSyncService {
       walletTokenCounts.set(ownership.wallet_address, currentCount + 1);
     }
 
+    logger.debug(`📊 Wallet calculation complete: ${walletTokenCounts.size} unique wallets`);
     return walletTokenCounts;
   }
 
@@ -275,6 +319,9 @@ class KaspunkOwnershipSyncService {
    */
   async updateOwnersTable(walletTokenCounts) {
     logger.info('🗑️ Clearing existing kaspunk_owners data...');
+    
+    // Enhanced logging before database operation
+    logger.debug('🗄️ [DATABASE] Starting kaspunk_owners table clear operation');
     
     const { error: deleteOwnersError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
@@ -285,6 +332,8 @@ class KaspunkOwnershipSyncService {
 
     if (deleteOwnersError) {
       logger.warn('⚠️ Warning: Failed to clear existing owners data:', deleteOwnersError);
+    } else {
+      logger.debug('✅ [DATABASE] Kaspunk_owners table cleared successfully');
     }
 
     // Insert new owners data in batches
@@ -305,6 +354,14 @@ class KaspunkOwnershipSyncService {
       const totalBatches = Math.ceil(ownerRecords.length / this.ownerBatchSize);
 
       logger.debug(`📝 Inserting owners batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
+      
+      // Enhanced logging before database batch operation
+      logger.debug('🗄️ [DATABASE] Starting owners batch insert', {
+        batchNumber,
+        totalBatches,
+        batchSize: batch.length,
+        totalOwners: ownerRecords.length
+      });
 
       const { error: insertOwnersError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
@@ -318,6 +375,7 @@ class KaspunkOwnershipSyncService {
       }
 
       insertedOwnersCount += batch.length;
+      logger.debug(`✅ [DATABASE] Owners batch ${batchNumber} inserted successfully`);
 
       // Small delay between batches
       await new Promise(resolve => setTimeout(resolve, this.batchDelay));
@@ -345,6 +403,14 @@ class KaspunkOwnershipSyncService {
       last_synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    // Enhanced logging before database operation
+    logger.debug('🗄️ [DATABASE] Starting collection stats upsert', {
+      totalSupply,
+      totalMinted,
+      totalHolders,
+      averageHolding: averageHolding.toFixed(2)
+    });
 
     // Upsert collection statistics
     const { error: statsError } = await retrySupabaseCall(async () => {

@@ -1,6 +1,7 @@
 import winston from 'winston';
 
-const logLevel = process.env.LOG_LEVEL || 'warn';
+// Change default log level to debug for better visibility
+const logLevel = process.env.LOG_LEVEL || 'debug';
 
 export const logger = winston.createLogger({
   level: logLevel,
@@ -20,3 +21,13 @@ export const logger = winston.createLogger({
     })
   ]
 });
+
+// Add a helper function for network debugging
+logger.networkDebug = (operation, details) => {
+  logger.debug(`🌐 [NETWORK] ${operation}`, details);
+};
+
+// Add a helper function for API debugging
+logger.apiDebug = (service, operation, details) => {
+  logger.debug(`📡 [${service.toUpperCase()}] ${operation}`, details);
+};

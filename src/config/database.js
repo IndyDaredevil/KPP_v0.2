@@ -38,7 +38,7 @@ logger.info('Supabase environment variables validated successfully', {
   serviceKeyPrefix: `${supabaseServiceRoleKey.substring(0, 20)}...`
 });
 
-// WebContainer-optimized fetch wrapper
+// WebContainer-optimized fetch wrapper with enhanced logging
 const createWebContainerFetch = (apiKey) => {
   return async (url, options = {}) => {
     const controller = new AbortController();
@@ -53,6 +53,16 @@ const createWebContainerFetch = (apiKey) => {
         ...options.headers
       };
       
+      // Enhanced logging before fetch call
+      logger.networkDebug('Supabase fetch request', {
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        method: options.method || 'GET',
+        hasHeaders: !!headers,
+        hasBody: !!options.body,
+        bodyLength: options.body ? JSON.stringify(options.body).length : 0,
+        timeout: 15000
+      });
+      
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
@@ -62,7 +72,27 @@ const createWebContainerFetch = (apiKey) => {
         cache: 'no-cache'
       });
       
+      // Log successful response
+      logger.networkDebug('Supabase fetch response', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : '')
+      });
+      
       return response;
+    } catch (error) {
+      // Enhanced error logging
+      logger.error('🌐 [NETWORK] Supabase fetch failed', {
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        method: options.method || 'GET',
+        errorName: error.name,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorCause: error.cause,
+        stack: error.stack?.substring(0, 500)
+      });
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -136,12 +166,14 @@ export async function testConnection() {
   }
 }
 
-// Simplified retry function for WebContainer with improved resilience
+// Simplified retry function for WebContainer with improved resilience and enhanced logging
 export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1500) {
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      logger.debug(`🔄 [SUPABASE] Attempt ${attempt}/${maxRetries} starting...`);
+      
       const result = await operation();
       
       // Check if the result contains an error (Supabase pattern)
@@ -151,21 +183,43 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
         error.details = result.error.details;
         error.hint = result.error.hint;
         error.supabaseError = result.error;
+        
+        logger.error(`🔄 [SUPABASE] Operation returned error on attempt ${attempt}`, {
+          errorMessage: error.message,
+          errorCode: error.code,
+          errorDetails: error.details,
+          errorHint: error.hint
+        });
+        
         throw error;
       }
       
+      logger.debug(`✅ [SUPABASE] Operation succeeded on attempt ${attempt}`);
       return result;
     } catch (error) {
       lastError = error;
+      
+      // Enhanced error logging
+      logger.error(`❌ [SUPABASE] Attempt ${attempt}/${maxRetries} failed`, {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        errorStack: error.stack?.substring(0, 300),
+        supabaseError: error.supabaseError
+      });
       
       // Check if it's a retryable error
       const shouldRetry = isRetryableSupabaseError(error);
       
       if (!shouldRetry || attempt === maxRetries) {
-        logger.error(`Supabase operation failed after ${attempt} attempts:`, {
+        logger.error(`🚫 [SUPABASE] Operation failed after ${attempt} attempts (final):`, {
           error: error.message,
           code: error.code,
-          finalAttempt: true
+          finalAttempt: true,
+          shouldRetry,
+          maxRetriesReached: attempt === maxRetries
         });
         throw error;
       }
@@ -173,12 +227,13 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 1
       // Longer delays for better stability
       const delay = Math.min(baseDelay * attempt, 4500);
       
-      logger.warn(`Supabase operation failed, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`, {
+      logger.warn(`🔄 [SUPABASE] Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`, {
         error: error.message,
         code: error.code,
         attempt,
         maxRetries,
-        delay
+        delay,
+        shouldRetry
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));

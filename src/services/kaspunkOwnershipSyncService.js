@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Comprehensive Kaspunk ownership sync service
- * Enhanced with upsert-based approach for better WebContainer stability
+ * Updated for new table structure with unique_token_id constraint
  */
 
 class KaspunkOwnershipSyncService {
@@ -12,7 +12,6 @@ class KaspunkOwnershipSyncService {
     this.apiUrl = 'https://mainnet.krc721.stream/api/v1/krc721/mainnet/owners/KASPUNKS';
     this.maxPages = 100; // Safety limit to prevent infinite loops
     this.batchSize = 25; // Reduced batch size for better stability
-    this.ownerBatchSize = 25; // Reduced batch size for owner records
     this.requestTimeout = 30000; // Reduced timeout for faster failure detection
     this.requestDelay = 300; // Reduced delay between API requests
     this.batchDelay = 100; // Reduced delay between database batches
@@ -37,7 +36,7 @@ class KaspunkOwnershipSyncService {
     const startTime = Date.now();
     
     try {
-      logger.info('🔍 Starting KasPunk token ownership sync (token_id deduplication only)...');
+      logger.info('🔍 Starting KasPunk token ownership sync (one record per token_id)...');
 
       // Step 1: Fetch all ownership data from Kaspa API
       const allOwnershipData = await this.fetchAllOwnershipData();
@@ -48,28 +47,21 @@ class KaspunkOwnershipSyncService {
 
       logger.info(`📊 Total ownership records collected: ${allOwnershipData.length}`);
 
-      // Step 2: Upsert token ownership data (with token_id deduplication)
-      await this.upsertTokenOwnershipTable(allOwnershipData);
+      // Step 2: Deduplicate by token_id (should be 1000 unique records)
+      const deduplicatedData = this.deduplicateByTokenId(allOwnershipData);
 
-      // DISABLED: Step 3: Calculate token counts per wallet
-      // const walletTokenCounts = this.calculateWalletTokenCounts(allOwnershipData);
-      // logger.info(`📊 Found ${walletTokenCounts.size} unique wallet addresses`);
-
-      // DISABLED: Step 4: Upsert owners data
-      // await this.upsertOwnersTable(walletTokenCounts);
-
-      // DISABLED: Step 5: Update collection statistics
-      // await this.updateCollectionStats(allOwnershipData, walletTokenCounts);
+      // Step 3: Upsert token ownership data
+      await this.upsertTokenOwnershipTable(deduplicatedData);
 
       // Calculate final statistics
-      const uniqueTokens = new Set(allOwnershipData.map(item => item.token_id)).size;
+      const uniqueTokens = deduplicatedData.length;
       const duration = Date.now() - startTime;
 
       const result = {
         success: true,
         message: 'KasPunk ownership data synced successfully',
         duration_ms: duration,
-        total_ownership_records: allOwnershipData.length,
+        total_ownership_records: deduplicatedData.length,
         unique_tokens: uniqueTokens,
         timestamp: new Date().toISOString()
       };
@@ -93,7 +85,7 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Fetch all ownership data from Kaspa API with pagination and WebContainer optimizations
+   * Fetch all ownership data from Kaspa API with pagination
    */
   async fetchAllOwnershipData() {
     const allOwnershipData = [];
@@ -256,39 +248,61 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Upsert token ownership data with token_id deduplication
+   * Deduplicate ownership data by token_id (keep the last occurrence)
    */
-  async upsertTokenOwnershipTable(allOwnershipData) {
-    logger.info('💾 Upserting token ownership data (token_id deduplication only)...');
+  deduplicateByTokenId(allOwnershipData) {
+    logger.info('🔍 Deduplicating ownership data by token_id...');
     
-    // Step 1: Deduplicate by token_id only (keep last occurrence)
-    const deduplicatedData = new Map();
+    const deduplicatedMap = new Map();
+    
+    // Process records and keep the last occurrence for each token_id
     for (const record of allOwnershipData) {
-      // Use only token_id as the key to ensure uniqueness by token_id
-      deduplicatedData.set(record.token_id, record);
+      deduplicatedMap.set(record.token_id, record);
     }
     
-    const uniqueOwnershipData = Array.from(deduplicatedData.values());
+    const deduplicatedData = Array.from(deduplicatedMap.values());
     
-    if (uniqueOwnershipData.length !== allOwnershipData.length) {
-      logger.info(`📊 Removed ${allOwnershipData.length - uniqueOwnershipData.length} duplicate token_id records from API data`);
+    const duplicatesRemoved = allOwnershipData.length - deduplicatedData.length;
+    if (duplicatesRemoved > 0) {
+      logger.info(`📊 Removed ${duplicatesRemoved} duplicate token_id records (kept last occurrence for each token)`);
+    } else {
+      logger.info('📊 No duplicates found - all token_ids are unique');
     }
+    
+    logger.info(`📊 Final deduplicated records: ${deduplicatedData.length}`);
+    
+    return deduplicatedData;
+  }
 
-    let upsertedOwnershipCount = 0;
+  /**
+   * Upsert token ownership data to the new table structure
+   */
+  async upsertTokenOwnershipTable(ownershipData) {
+    logger.info(`💾 Upserting ${ownershipData.length} token ownership records...`);
+    
+    let upsertedCount = 0;
 
-    // Step 2: Upsert all data in batches
-    for (let i = 0; i < uniqueOwnershipData.length; i += this.batchSize) {
-      const batch = uniqueOwnershipData.slice(i, i + this.batchSize);
+    // Process data in batches
+    for (let i = 0; i < ownershipData.length; i += this.batchSize) {
+      const batch = ownershipData.slice(i, i + this.batchSize);
       const batchNumber = Math.floor(i / this.batchSize) + 1;
-      const totalBatches = Math.ceil(uniqueOwnershipData.length / this.batchSize);
+      const totalBatches = Math.ceil(ownershipData.length / this.batchSize);
 
       logger.debug(`📝 Upserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
 
-      // Use upsert with conflict resolution on token_id only
+      // Prepare batch data with timestamps
+      const batchWithTimestamps = batch.map(record => ({
+        token_id: record.token_id,
+        wallet_address: record.wallet_address,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      // Use upsert with conflict resolution on token_id (matches unique_token_id constraint)
       const { error: upsertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
-          .upsert(batch, {
+          .upsert(batchWithTimestamps, {
             onConflict: 'token_id',
             ignoreDuplicates: false
           });
@@ -299,65 +313,49 @@ class KaspunkOwnershipSyncService {
         throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
       }
 
-      upsertedOwnershipCount += batch.length;
+      upsertedCount += batch.length;
       logger.debug(`✅ Ownership batch ${batchNumber} upserted successfully`);
 
-      // Shorter delay between batches
+      // Delay between batches
       if (batchNumber < totalBatches) {
         await new Promise(resolve => setTimeout(resolve, this.batchDelay));
       }
     }
 
-    logger.info(`✅ Upserted ${upsertedOwnershipCount} ownership records`);
+    logger.info(`✅ Successfully upserted ${upsertedCount} ownership records`);
 
-    // Step 3: Verify final record count
-    const { count: finalCount, error: finalCountError } = await retrySupabaseCall(async () => {
-      return await supabaseAdmin
-        .from('kaspunk_token_ownership')
-        .select('*', { count: 'exact', head: true });
-    }, 3, 2000);
+    // Verify final record count
+    await this.verifyFinalRecordCount();
+  }
 
-    if (finalCountError) {
-      logger.warn('⚠️ Could not verify final record count:', finalCountError.message);
-    } else {
-      logger.info(`📊 Final records in kaspunk_token_ownership: ${finalCount || 0}`);
+  /**
+   * Verify the final record count in the database
+   */
+  async verifyFinalRecordCount() {
+    try {
+      const { count: finalCount, error: countError } = await retrySupabaseCall(async () => {
+        return await supabaseAdmin
+          .from('kaspunk_token_ownership')
+          .select('*', { count: 'exact', head: true });
+      }, 3, 2000);
+
+      if (countError) {
+        logger.warn('⚠️ Could not verify final record count:', countError.message);
+      } else {
+        logger.info(`📊 Final verification: ${finalCount || 0} records in kaspunk_token_ownership table`);
+        
+        // Expected count should be 1000 (one for each KasPunk token)
+        if (finalCount === 1000) {
+          logger.info('✅ Perfect! Expected 1000 records and found exactly 1000');
+        } else if (finalCount && finalCount > 0) {
+          logger.warn(`⚠️ Found ${finalCount} records, expected 1000. This might be normal if not all tokens are owned.`);
+        } else {
+          logger.error('❌ No records found in table after upsert operation');
+        }
+      }
+    } catch (error) {
+      logger.warn('⚠️ Error during final verification:', error.message);
     }
-  }
-
-  /**
-   * Calculate token counts per wallet address
-   * DISABLED - not used in current implementation
-   */
-  calculateWalletTokenCounts(allOwnershipData) {
-    logger.info('📊 Calculating token counts per wallet...');
-    
-    const walletTokenCounts = new Map();
-    
-    for (const ownership of allOwnershipData) {
-      const currentCount = walletTokenCounts.get(ownership.wallet_address) || 0;
-      walletTokenCounts.set(ownership.wallet_address, currentCount + 1);
-    }
-
-    logger.debug(`📊 Wallet calculation complete: ${walletTokenCounts.size} unique wallets`);
-    return walletTokenCounts;
-  }
-
-  /**
-   * Upsert owners data - DISABLED
-   */
-  async upsertOwnersTable(walletTokenCounts) {
-    logger.info('💾 Upserting kaspunk_owners data - DISABLED...');
-    // This function is disabled as requested
-    return;
-  }
-
-  /**
-   * Update collection statistics - DISABLED
-   */
-  async updateCollectionStats(allOwnershipData, walletTokenCounts) {
-    logger.info('📊 Updating collection statistics - DISABLED...');
-    // This function is disabled as requested
-    return;
   }
 }
 

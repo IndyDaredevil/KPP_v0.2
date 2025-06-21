@@ -5,17 +5,20 @@ import { logger } from '../utils/logger.js';
 /**
  * Comprehensive Kaspunk ownership sync service
  * Updated for new table structure with unique_token_id constraint
+ * Enhanced with WebContainer network error handling
  */
 
 class KaspunkOwnershipSyncService {
   constructor() {
     this.apiUrl = 'https://mainnet.krc721.stream/api/v1/krc721/mainnet/owners/KASPUNKS';
     this.maxPages = 100; // Safety limit to prevent infinite loops
-    this.batchSize = 25; // Reduced batch size for better stability
-    this.requestTimeout = 30000; // Reduced timeout for faster failure detection
-    this.requestDelay = 300; // Reduced delay between API requests
-    this.batchDelay = 500; // Increased delay between database batches for network stability
+    this.batchSize = 10; // Reduced batch size for better network stability
+    this.requestTimeout = 45000; // Increased timeout for WebContainer
+    this.requestDelay = 500; // Increased delay between API requests
+    this.batchDelay = 2000; // Increased delay between database batches
     this.maxRetries = 3; // Reduced retries for faster failure detection
+    this.maxSupabaseRetries = 8; // Increased Supabase retries for network issues
+    this.supabaseBaseDelay = 5000; // Increased base delay for Supabase operations
   }
 
   /**
@@ -36,7 +39,7 @@ class KaspunkOwnershipSyncService {
     const startTime = Date.now();
     
     try {
-      logger.info('🔍 Starting KasPunk token ownership sync (one record per token_id)...');
+      logger.info('🔍 Starting KasPunk token ownership sync (WebContainer optimized)...');
 
       // Step 1: Check current table state
       await this.checkCurrentTableState();
@@ -56,7 +59,7 @@ class KaspunkOwnershipSyncService {
       // Step 4: Show sample data for debugging
       this.logSampleData(deduplicatedData);
 
-      // Step 5: Upsert token ownership data
+      // Step 5: Upsert token ownership data with enhanced error handling
       await this.upsertTokenOwnershipTable(deduplicatedData);
 
       // Calculate final statistics
@@ -97,18 +100,19 @@ class KaspunkOwnershipSyncService {
     try {
       logger.info('🔍 Checking current table state...');
       
-      // Temporarily disable table state check to avoid syntax errors
-      logger.info('📊 Table state check temporarily disabled');
-      
-      /*
+      // Use enhanced retry mechanism for table state check
       const { count: currentCount, error: countError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .select('*', { count: 'exact', head: true });
-      }, 3, 2000);
+      }, 3, 3000);
 
       if (countError) {
-        logger.warn('⚠️ Could not check current table state:', countError.message);
+        logger.warn('⚠️ Could not check current table state (WebContainer network issue):', {
+          message: countError.message,
+          code: countError.code,
+          isDnsRoutingError: countError.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+        });
       } else {
         logger.info(`📊 Current table has ${currentCount || 0} records`);
         
@@ -118,15 +122,18 @@ class KaspunkOwnershipSyncService {
             .from('kaspunk_token_ownership')
             .select('token_id, wallet_address')
             .limit(3);
-        }, 3, 2000);
+        }, 3, 3000);
 
         if (!sampleError && sampleRecords && sampleRecords.length > 0) {
           logger.info('📋 Sample existing records:', sampleRecords);
         }
       }
-      */
     } catch (error) {
-      logger.warn('⚠️ Error checking table state:', error.message);
+      logger.warn('⚠️ Error checking table state (WebContainer network limitation):', {
+        message: error.message,
+        code: error.code,
+        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+      });
     }
   }
 
@@ -332,14 +339,15 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Upsert token ownership data to the new table structure
+   * Upsert token ownership data with enhanced WebContainer error handling
    */
   async upsertTokenOwnershipTable(ownershipData) {
-    logger.info(`💾 Upserting ${ownershipData.length} token ownership records...`);
+    logger.info(`💾 Upserting ${ownershipData.length} token ownership records (WebContainer optimized)...`);
     
     let upsertedCount = 0;
+    let failedBatches = 0;
 
-    // Process data in batches
+    // Process data in smaller batches for better network stability
     for (let i = 0; i < ownershipData.length; i += this.batchSize) {
       const batch = ownershipData.slice(i, i + this.batchSize);
       const batchNumber = Math.floor(i / this.batchSize) + 1;
@@ -358,20 +366,29 @@ class KaspunkOwnershipSyncService {
       logger.debug(`🔍 Sample batch data:`, batchWithTimestamps.slice(0, 2));
 
       try {
-        // Call the new Supabase RPC function for upserting with increased retries and delay
+        // Call the Supabase RPC function with enhanced retry mechanism
         const { error: upsertError } = await retrySupabaseCall(async () => {
           return await supabaseAdmin.rpc('upsert_kaspunk_ownership', {
-            records: batchWithTimestamps // Pass the array of records to the function
+            records: batchWithTimestamps
           });
-        }, 5, 2000); // Increased retries from 1 to 5 and delay from 1000 to 2000
+        }, this.maxSupabaseRetries, this.supabaseBaseDelay);
 
         if (upsertError) {
           logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, {
             error: upsertError,
             batchSize: batch.length,
-            sampleData: batchWithTimestamps.slice(0, 2)
+            sampleData: batchWithTimestamps.slice(0, 2),
+            isDnsRoutingError: upsertError.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
           });
-          throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
+          
+          failedBatches++;
+          
+          // For DNS routing errors, provide specific guidance
+          if (upsertError.code === 'WEBCONTAINER_DNS_ROUTING_ERROR') {
+            logger.error(`🚨 [DNS] Batch ${batchNumber} failed due to DNS routing issue - requests are being routed to localhost instead of Supabase`);
+          }
+          
+          throw new Error(`Failed to upsert ownership data batch ${batchNumber}: ${upsertError.message}`);
         }
 
         upsertedCount += batch.length;
@@ -380,18 +397,36 @@ class KaspunkOwnershipSyncService {
       } catch (error) {
         logger.error(`❌ Critical error in batch ${batchNumber}:`, {
           error: error.message,
-          batchData: batchWithTimestamps.slice(0, 2)
+          code: error.code,
+          batchData: batchWithTimestamps.slice(0, 2),
+          isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR',
+          isNetworkError: error.code === 'WEBCONTAINER_NETWORK_ERROR'
         });
+        
+        failedBatches++;
+        
+        // Provide specific guidance for different error types
+        if (error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR') {
+          logger.error(`🚨 [DNS] Critical DNS routing issue detected. WebContainer is routing Supabase requests to localhost (127.0.0.1) instead of the external Supabase servers.`);
+          logger.error(`🔧 [DNS] This requires WebContainer network configuration fixes or DNS resolver adjustments.`);
+        } else if (error.code === 'WEBCONTAINER_NETWORK_ERROR') {
+          logger.error(`🌐 [NETWORK] Network connectivity issue detected. This may be a temporary WebContainer network problem.`);
+        }
+        
         throw error;
       }
 
-      // Delay between batches
+      // Longer delay between batches for WebContainer stability
       if (batchNumber < totalBatches) {
         await new Promise(resolve => setTimeout(resolve, this.batchDelay));
       }
     }
 
     logger.info(`✅ Successfully upserted ${upsertedCount} ownership records`);
+    
+    if (failedBatches > 0) {
+      logger.warn(`⚠️ ${failedBatches} batches failed during upsert process`);
+    }
 
     // Verify final record count
     await this.verifyFinalRecordCount();
@@ -406,10 +441,14 @@ class KaspunkOwnershipSyncService {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
           .select('*', { count: 'exact', head: true });
-      }, 3, 2000);
+      }, 5, 4000);
 
       if (countError) {
-        logger.warn('⚠️ Could not verify final record count:', countError.message);
+        logger.warn('⚠️ Could not verify final record count (WebContainer network issue):', {
+          message: countError.message,
+          code: countError.code,
+          isDnsRoutingError: countError.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+        });
       } else {
         logger.info(`📊 Final verification: ${finalCount || 0} records in kaspunk_token_ownership table`);
         
@@ -423,7 +462,11 @@ class KaspunkOwnershipSyncService {
         }
       }
     } catch (error) {
-      logger.warn('⚠️ Error during final verification:', error.message);
+      logger.warn('⚠️ Error during final verification (WebContainer network limitation):', {
+        message: error.message,
+        code: error.code,
+        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
+      });
     }
   }
 }

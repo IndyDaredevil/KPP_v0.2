@@ -38,13 +38,24 @@ logger.info('Supabase environment variables validated successfully', {
   serviceKeyPrefix: `${supabaseServiceRoleKey.substring(0, 20)}...`
 });
 
-// WebContainer-optimized fetch wrapper with enhanced logging and network fixes
+// WebContainer-optimized fetch wrapper with DNS resolution fixes
 const createWebContainerFetch = (apiKey) => {
   return async (url, options = {}) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // Increased timeout for WebContainer
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased timeout
     
     try {
+      // Extract hostname from URL for DNS debugging
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
+      // Log DNS resolution attempt
+      logger.networkDebug('DNS resolution attempt', {
+        hostname,
+        url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        isSupabaseUrl: hostname.includes('supabase.co')
+      });
+
       const headers = {
         'Content-Type': 'application/json',
         'apikey': apiKey,
@@ -53,6 +64,8 @@ const createWebContainerFetch = (apiKey) => {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        // Add DNS resolution hints
+        'Host': hostname,
         ...options.headers
       };
       
@@ -60,14 +73,15 @@ const createWebContainerFetch = (apiKey) => {
       logger.networkDebug('Supabase fetch request', {
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
         method: options.method || 'GET',
+        hostname,
         hasHeaders: !!headers,
         hasBody: !!options.body,
         bodyLength: options.body ? JSON.stringify(options.body).length : 0,
-        timeout: 25000,
+        timeout: 30000,
         userAgent: headers['User-Agent']
       });
       
-      // WebContainer-specific fetch configuration
+      // WebContainer-specific fetch configuration with DNS fixes
       const fetchOptions = {
         ...options,
         signal: controller.signal,
@@ -76,26 +90,32 @@ const createWebContainerFetch = (apiKey) => {
         keepalive: false,
         cache: 'no-cache',
         mode: 'cors',
-        credentials: 'omit'
-        // Removed family: 4 option that was causing localhost routing issues
+        credentials: 'omit',
+        // Force IPv4 resolution to avoid localhost routing
+        family: 4
       };
 
       const response = await fetch(url, fetchOptions);
       
-      // Log successful response
+      // Log successful response with connection details
       logger.networkDebug('Supabase fetch response', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
-        headers: Object.fromEntries(response.headers.entries())
+        headers: Object.fromEntries(response.headers.entries()),
+        hostname
       });
       
       return response;
     } catch (error) {
-      // Enhanced error logging with WebContainer-specific details
+      // Enhanced error logging with network diagnostics
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
       logger.error('🌐 [NETWORK] Supabase fetch failed', {
         url: url.substring(0, 100) + (url.length > 100 ? '...' : ''),
+        hostname,
         method: options.method || 'GET',
         errorName: error.name,
         errorMessage: error.message,
@@ -105,20 +125,35 @@ const createWebContainerFetch = (apiKey) => {
         // WebContainer-specific debugging
         isAbortError: error.name === 'AbortError',
         isNetworkError: error.message?.includes('fetch failed'),
-        isSocketError: error.cause?.code === 'UND_ERR_SOCKET'
+        isSocketError: error.cause?.code === 'UND_ERR_SOCKET',
+        // DNS resolution debugging
+        isDnsError: error.message?.includes('getaddrinfo'),
+        isLocalhostRouting: error.cause?.socket?.remoteAddress === '127.0.0.1'
       });
       
-      // Transform WebContainer-specific errors into more actionable messages
+      // Transform WebContainer-specific errors with better diagnostics
       if (error.cause?.code === 'UND_ERR_SOCKET') {
-        const newError = new Error(`WebContainer network error: Unable to establish connection to Supabase. This may be a temporary network issue.`);
-        newError.code = 'WEBCONTAINER_NETWORK_ERROR';
-        newError.originalError = error;
-        throw newError;
+        const isLocalhostRouting = error.cause?.socket?.remoteAddress === '127.0.0.1';
+        
+        if (isLocalhostRouting) {
+          const newError = new Error(`WebContainer DNS routing error: Request to ${hostname} was incorrectly routed to localhost (127.0.0.1). This is a WebContainer network configuration issue.`);
+          newError.code = 'WEBCONTAINER_DNS_ROUTING_ERROR';
+          newError.hostname = hostname;
+          newError.originalError = error;
+          throw newError;
+        } else {
+          const newError = new Error(`WebContainer network error: Unable to establish connection to ${hostname}. This may be a temporary network issue.`);
+          newError.code = 'WEBCONTAINER_NETWORK_ERROR';
+          newError.hostname = hostname;
+          newError.originalError = error;
+          throw newError;
+        }
       }
       
       if (error.name === 'AbortError') {
-        const newError = new Error('Request timeout: Supabase connection took too long to respond');
+        const newError = new Error(`Request timeout: Connection to ${hostname} took too long to respond`);
         newError.code = 'TIMEOUT_ERROR';
+        newError.hostname = hostname;
         newError.originalError = error;
         throw newError;
       }
@@ -188,13 +223,13 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, a
 // WebContainer-friendly test connection function with enhanced error handling
 export async function testConnection() {
   try {
-    logger.info('Testing database connection (WebContainer mode with network resilience)...');
+    logger.info('Testing database connection (WebContainer mode with DNS diagnostics)...');
     
     // Use a simpler test that's more likely to work in WebContainer
     const { data, error } = await Promise.race([
       supabase.from('users').select('count', { count: 'exact', head: true }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+        setTimeout(() => reject(new Error('Connection timeout after 20 seconds')), 20000)
       )
     ]);
 
@@ -203,7 +238,8 @@ export async function testConnection() {
         message: error.message,
         code: error.code,
         isNetworkError: error.message?.includes('fetch failed'),
-        isSocketError: error.message?.includes('UND_ERR_SOCKET')
+        isSocketError: error.message?.includes('UND_ERR_SOCKET'),
+        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
       });
       // In WebContainer, we'll allow the server to start even if the initial connection fails
       return false;
@@ -217,15 +253,16 @@ export async function testConnection() {
       name: error.name,
       code: error.code,
       isTimeout: error.message?.includes('timeout'),
-      isNetworkError: error.message?.includes('network')
+      isNetworkError: error.message?.includes('network'),
+      isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
     });
     // In WebContainer, we'll allow the server to start even if the initial connection fails
     return false;
   }
 }
 
-// Enhanced retry function for WebContainer with improved resilience and network-specific handling
-export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2000) {
+// Enhanced retry function with DNS routing error handling
+export async function retrySupabaseCall(operation, maxRetries = 5, baseDelay = 3000) {
   let lastError;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -257,7 +294,7 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2
     } catch (error) {
       lastError = error;
       
-      // Enhanced error logging with WebContainer-specific context
+      // Enhanced error logging with DNS routing diagnostics
       logger.error(`❌ [SUPABASE] Attempt ${attempt}/${maxRetries} failed`, {
         errorName: error.name,
         errorMessage: error.message,
@@ -267,16 +304,28 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2
         errorStack: error.stack?.substring(0, 300),
         supabaseError: error.supabaseError,
         isWebContainerNetworkError: error.code === 'WEBCONTAINER_NETWORK_ERROR',
-        isTimeoutError: error.code === 'TIMEOUT_ERROR'
+        isDnsRoutingError: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR',
+        isTimeoutError: error.code === 'TIMEOUT_ERROR',
+        hostname: error.hostname
       });
       
       // Check if it's a retryable error
       const shouldRetry = isRetryableSupabaseError(error);
       
+      // Special handling for DNS routing errors
+      if (error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR') {
+        logger.error(`🚨 [DNS] Critical DNS routing issue detected - requests to ${error.hostname} are being routed to localhost`);
+        
+        if (attempt === maxRetries) {
+          logger.error(`🚫 [DNS] DNS routing issue persists after ${maxRetries} attempts. This requires WebContainer network configuration fixes.`);
+        }
+      }
+      
       if (!shouldRetry || attempt === maxRetries) {
         logger.error(`🚫 [SUPABASE] Operation failed after ${attempt} attempts (final):`, {
           error: error.message,
           code: error.code,
+          hostname: error.hostname,
           finalAttempt: true,
           shouldRetry,
           maxRetriesReached: attempt === maxRetries
@@ -284,17 +333,21 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2
         throw error;
       }
       
-      // Longer delays for WebContainer network issues
-      const delay = Math.min(baseDelay * Math.pow(1.5, attempt - 1), 8000);
+      // Exponential backoff with longer delays for DNS issues
+      const delay = error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR' 
+        ? Math.min(baseDelay * Math.pow(2, attempt - 1), 15000)
+        : Math.min(baseDelay * Math.pow(1.5, attempt - 1), 10000);
       
       logger.warn(`🔄 [SUPABASE] Retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`, {
         error: error.message,
         code: error.code,
+        hostname: error.hostname,
         attempt,
         maxRetries,
         delay,
         shouldRetry,
-        isNetworkIssue: error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR'
+        isNetworkIssue: error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR',
+        isDnsIssue: error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR'
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -304,7 +357,7 @@ export async function retrySupabaseCall(operation, maxRetries = 3, baseDelay = 2
   throw lastError;
 }
 
-// Enhanced error detection for WebContainer with network-specific handling
+// Enhanced error detection with DNS routing error handling
 function isRetryableSupabaseError(error) {
   // Don't retry authentication/authorization errors
   if (error.message && (
@@ -326,8 +379,10 @@ function isRetryableSupabaseError(error) {
     return false;
   }
 
-  // Always retry WebContainer-specific network errors
-  if (error.code === 'WEBCONTAINER_NETWORK_ERROR' || error.code === 'TIMEOUT_ERROR') {
+  // Always retry WebContainer-specific network errors (including DNS routing)
+  if (error.code === 'WEBCONTAINER_NETWORK_ERROR' || 
+      error.code === 'WEBCONTAINER_DNS_ROUTING_ERROR' || 
+      error.code === 'TIMEOUT_ERROR') {
     return true;
   }
 
@@ -366,12 +421,17 @@ function isRetryableSupabaseError(error) {
   return false;
 }
 
-// WebContainer-friendly connectivity check with enhanced error handling
+// WebContainer-friendly connectivity check with DNS diagnostics
 export async function checkSupabaseConnectivity() {
   try {
     const startTime = Date.now();
+    const urlObj = new URL(supabaseUrl);
+    const hostname = urlObj.hostname;
     
-    logger.info('🔍 Starting WebContainer-optimized connectivity check...');
+    logger.info('🔍 Starting WebContainer-optimized connectivity check with DNS diagnostics...', {
+      hostname,
+      url: supabaseUrl
+    });
     
     const response = await Promise.race([
       fetch(`${supabaseUrl}/rest/v1/`, {
@@ -381,14 +441,16 @@ export async function checkSupabaseConnectivity() {
           'Authorization': `Bearer ${supabaseKey}`,
           'User-Agent': 'nft-listings-webcontainer/1.0.0',
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Host': hostname
         },
         cache: 'no-cache',
         mode: 'cors',
-        credentials: 'omit'
+        credentials: 'omit',
+        family: 4 // Force IPv4
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connectivity check timeout after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('Connectivity check timeout after 15 seconds')), 15000)
       )
     ]);
     
@@ -399,13 +461,15 @@ export async function checkSupabaseConnectivity() {
       connected: response.ok,
       latency,
       status: response.status,
-      statusText: response.statusText
+      statusText: response.statusText,
+      hostname
     };
     
     if (response.ok) {
       logger.info('✅ Supabase connectivity check successful', {
         status: response.status,
         latency: `${latency}ms`,
+        hostname,
         url: supabaseUrl
       });
     } else {
@@ -413,6 +477,7 @@ export async function checkSupabaseConnectivity() {
         status: response.status,
         statusText: response.statusText,
         latency: `${latency}ms`,
+        hostname,
         url: supabaseUrl
       });
     }
@@ -420,17 +485,27 @@ export async function checkSupabaseConnectivity() {
     return result;
     
   } catch (error) {
-    logger.warn('⚠️ Supabase connectivity check failed (WebContainer limitation):', {
+    const urlObj = new URL(supabaseUrl);
+    const hostname = urlObj.hostname;
+    const isLocalhostRouting = error.cause?.socket?.remoteAddress === '127.0.0.1';
+    
+    logger.warn('⚠️ Supabase connectivity check failed (WebContainer network issue):', {
       error: error.message,
+      hostname,
       url: supabaseUrl,
       isTimeout: error.message?.includes('timeout'),
-      isNetworkError: error.message?.includes('fetch failed')
+      isNetworkError: error.message?.includes('fetch failed'),
+      isSocketError: error.cause?.code === 'UND_ERR_SOCKET',
+      isLocalhostRouting,
+      remoteAddress: error.cause?.socket?.remoteAddress
     });
     
     return {
       connected: false,
       latency: null,
-      error: error.message
+      error: error.message,
+      hostname,
+      isLocalhostRouting
     };
   }
 }

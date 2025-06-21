@@ -20,6 +20,17 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
+   * Normalize wallet address to ensure consistency
+   */
+  normalizeWalletAddress(address) {
+    if (!address || typeof address !== 'string') {
+      return null;
+    }
+    // Trim whitespace and convert to lowercase for consistency
+    return address.trim().toLowerCase();
+  }
+
+  /**
    * Main sync function - orchestrates the entire ownership sync process
    */
   async syncKaspunkOwnership() {
@@ -238,10 +249,13 @@ class KaspunkOwnershipSyncService {
       return null;
     }
 
-    if (!isNaN(tokenId) && tokenId > 0 && owner) {
+    // Normalize the wallet address to ensure consistency
+    const normalizedOwner = this.normalizeWalletAddress(owner);
+
+    if (!isNaN(tokenId) && tokenId > 0 && normalizedOwner) {
       return {
         token_id: tokenId,
-        wallet_address: owner
+        wallet_address: normalizedOwner
       };
     }
 

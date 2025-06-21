@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Comprehensive Kaspunk ownership sync service
- * Enhanced with truncate-and-insert approach for better performance and data consistency
+ * Enhanced with upsert-based approach for better WebContainer stability
  */
 
 class KaspunkOwnershipSyncService {
@@ -37,7 +37,7 @@ class KaspunkOwnershipSyncService {
     const startTime = Date.now();
     
     try {
-      logger.info('🔍 Starting KasPunk token ownership sync (Truncate-and-insert approach)...');
+      logger.info('🔍 Starting KasPunk token ownership sync (Upsert approach for WebContainer stability)...');
 
       // Step 1: Fetch all ownership data from Kaspa API
       const allOwnershipData = await this.fetchAllOwnershipData();
@@ -48,14 +48,14 @@ class KaspunkOwnershipSyncService {
 
       logger.info(`📊 Total ownership records collected: ${allOwnershipData.length}`);
 
-      // Step 2: Truncate and insert token ownership data (full refresh)
-      await this.truncateAndInsertTokenOwnership(allOwnershipData);
+      // Step 2: Upsert token ownership data (WebContainer-friendly approach)
+      await this.upsertTokenOwnershipTable(allOwnershipData);
 
       // Step 3: Calculate token counts per wallet
       const walletTokenCounts = this.calculateWalletTokenCounts(allOwnershipData);
       logger.info(`📊 Found ${walletTokenCounts.size} unique wallet addresses`);
 
-      // Step 4: Upsert owners data (keep upsert approach for aggregated data)
+      // Step 4: Upsert owners data
       await this.upsertOwnersTable(walletTokenCounts);
 
       // Step 5: Update collection statistics
@@ -263,49 +263,12 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Truncate and insert token ownership data for a full refresh
-   * This is more efficient than upsert when we have a complete snapshot
+   * Upsert token ownership data (WebContainer-friendly approach)
    */
-  async truncateAndInsertTokenOwnership(allOwnershipData) {
-    logger.info('💾 Truncating and inserting token ownership data for full refresh...');
+  async upsertTokenOwnershipTable(allOwnershipData) {
+    logger.info('💾 Upserting token ownership data (WebContainer-friendly approach)...');
     
-    // Step 1: Check current record count before truncation
-    logger.debug('🔍 Checking current record count before truncation...');
-    const { count: currentCount, error: countError } = await retrySupabaseCall(async () => {
-      return await supabaseAdmin
-        .from('kaspunk_token_ownership')
-        .select('*', { count: 'exact', head: true });
-    }, 3, 2000);
-
-    if (countError) {
-      logger.warn('⚠️ Could not get current record count:', countError.message);
-    } else {
-      logger.info(`📊 Current records in kaspunk_token_ownership: ${currentCount || 0}`);
-    }
-
-    // Step 2: Truncate the table (delete all existing records)
-    logger.debug('🗑️ Truncating kaspunk_token_ownership table...');
-    const { count: deletedCount, error: truncateError } = await retrySupabaseCall(async () => {
-      return await supabaseAdmin
-        .from('kaspunk_token_ownership')
-        .delete({ count: 'exact' })
-        .neq('token_id', 0); // This condition ensures we delete all rows (token_id is never 0)
-    }, 3, 2000);
-
-    if (truncateError) {
-      logger.error('❌ Error truncating kaspunk_token_ownership table:', truncateError);
-      throw new Error(`Failed to truncate ownership data: ${truncateError.message}`);
-    }
-    
-    logger.info(`✅ kaspunk_token_ownership table truncated successfully - deleted ${deletedCount || 0} records`);
-
-    if (allOwnershipData.length === 0) {
-      logger.info('✅ No new ownership records to insert after truncation.');
-      return;
-    }
-
-    // Step 3: Deduplicate the data before insertion
-    // Since the API should provide unique records, this is a safety measure
+    // Step 1: Deduplicate the data before upserting
     const deduplicatedData = new Map();
     for (const record of allOwnershipData) {
       const key = `${record.token_id}-${record.wallet_address}`;
@@ -315,32 +278,36 @@ class KaspunkOwnershipSyncService {
     const uniqueOwnershipData = Array.from(deduplicatedData.values());
     
     if (uniqueOwnershipData.length !== allOwnershipData.length) {
-      logger.warn(`⚠️ Removed ${allOwnershipData.length - uniqueOwnershipData.length} duplicate records from API data`);
+      logger.info(`📊 Removed ${allOwnershipData.length - uniqueOwnershipData.length} duplicate records from API data`);
     }
 
-    let insertedOwnershipCount = 0;
+    let upsertedOwnershipCount = 0;
 
-    // Step 4: Insert all new data in batches
+    // Step 2: Upsert all data in batches
     for (let i = 0; i < uniqueOwnershipData.length; i += this.batchSize) {
       const batch = uniqueOwnershipData.slice(i, i + this.batchSize);
       const batchNumber = Math.floor(i / this.batchSize) + 1;
       const totalBatches = Math.ceil(uniqueOwnershipData.length / this.batchSize);
 
-      logger.debug(`📝 Inserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
+      logger.debug(`📝 Upserting ownership batch ${batchNumber}/${totalBatches} (${batch.length} records)...`);
 
-      const { error: insertError } = await retrySupabaseCall(async () => {
+      // Use upsert with conflict resolution on token_id and wallet_address
+      const { error: upsertError } = await retrySupabaseCall(async () => {
         return await supabaseAdmin
           .from('kaspunk_token_ownership')
-          .insert(batch);
+          .upsert(batch, {
+            onConflict: 'token_id,wallet_address',
+            ignoreDuplicates: false
+          });
       }, 3, 2000);
 
-      if (insertError) {
-        logger.error(`❌ Error inserting ownership batch ${batchNumber}:`, insertError);
-        throw new Error(`Failed to insert ownership data: ${insertError.message}`);
+      if (upsertError) {
+        logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, upsertError);
+        throw new Error(`Failed to upsert ownership data: ${upsertError.message}`);
       }
 
-      insertedOwnershipCount += batch.length;
-      logger.debug(`✅ Ownership batch ${batchNumber} inserted successfully`);
+      upsertedOwnershipCount += batch.length;
+      logger.debug(`✅ Ownership batch ${batchNumber} upserted successfully`);
 
       // Shorter delay between batches
       if (batchNumber < totalBatches) {
@@ -348,9 +315,9 @@ class KaspunkOwnershipSyncService {
       }
     }
 
-    logger.info(`✅ Inserted ${insertedOwnershipCount} ownership records (${allOwnershipData.length - uniqueOwnershipData.length} duplicates removed)`);
+    logger.info(`✅ Upserted ${upsertedOwnershipCount} ownership records`);
 
-    // Step 5: Verify final record count
+    // Step 3: Verify final record count
     const { count: finalCount, error: finalCountError } = await retrySupabaseCall(async () => {
       return await supabaseAdmin
         .from('kaspunk_token_ownership')
@@ -361,10 +328,6 @@ class KaspunkOwnershipSyncService {
       logger.warn('⚠️ Could not verify final record count:', finalCountError.message);
     } else {
       logger.info(`📊 Final records in kaspunk_token_ownership: ${finalCount || 0}`);
-      
-      if (finalCount !== insertedOwnershipCount) {
-        logger.warn(`⚠️ Record count mismatch: inserted ${insertedOwnershipCount} but table has ${finalCount}`);
-      }
     }
   }
 
@@ -386,7 +349,7 @@ class KaspunkOwnershipSyncService {
   }
 
   /**
-   * Upsert owners data (keep upsert approach for aggregated data)
+   * Upsert owners data
    */
   async upsertOwnersTable(walletTokenCounts) {
     logger.info('💾 Upserting kaspunk_owners data...');

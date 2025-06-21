@@ -14,7 +14,7 @@ class KaspunkOwnershipSyncService {
     this.batchSize = 25; // Reduced batch size for better stability
     this.requestTimeout = 30000; // Reduced timeout for faster failure detection
     this.requestDelay = 300; // Reduced delay between API requests
-    this.batchDelay = 100; // Reduced delay between database batches
+    this.batchDelay = 500; // Increased delay between database batches for network stability
     this.maxRetries = 3; // Reduced retries for faster failure detection
   }
 
@@ -358,12 +358,12 @@ class KaspunkOwnershipSyncService {
       logger.debug(`🔍 Sample batch data:`, batchWithTimestamps.slice(0, 2));
 
       try {
-        // Call the new Supabase RPC function for upserting
+        // Call the new Supabase RPC function for upserting with increased retries and delay
         const { error: upsertError } = await retrySupabaseCall(async () => {
           return await supabaseAdmin.rpc('upsert_kaspunk_ownership', {
             records: batchWithTimestamps // Pass the array of records to the function
           });
-        }, 1, 1000); // Reduced retries for faster debugging
+        }, 5, 2000); // Increased retries from 1 to 5 and delay from 1000 to 2000
 
         if (upsertError) {
           logger.error(`❌ Error upserting ownership batch ${batchNumber}:`, {
